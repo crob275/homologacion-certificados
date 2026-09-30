@@ -75,7 +75,7 @@ router.get('/configurar-correo-prueba', (req, res) => {
 });
 
 // Diagnóstico de Conexión SMTP y Prueba en Vivo
-router.get('/smtp-status', async (req, res) => {
+router.get(['/smtp-status', '/smtp_status'], async (req, res) => {
     const { crearTransporterSMTP } = require('../services/email.service');
     const transporter = crearTransporterSMTP();
     res.json({
