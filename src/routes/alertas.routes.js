@@ -21,6 +21,20 @@ router.get('/historial', async (req, res) => {
     }
 });
 
+// Diagnóstico de Conexión SMTP y Prueba en Vivo (ANTES de /:id para evitar colisiones)
+router.get(['/smtp-status', '/smtp_status'], async (req, res) => {
+    const { crearTransporterSMTP } = require('../services/email.service');
+    const transporter = crearTransporterSMTP();
+    res.json({
+        smtp_configurado: Boolean(transporter),
+        smtp_user: process.env.SMTP_USER || 'No configurado',
+        smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        smtp_port: process.env.SMTP_PORT || 465,
+        test_mode_activo: process.env.SMTP_TEST_MODE === 'true',
+        test_email: process.env.SMTP_TEST_EMAIL || null
+    });
+});
+
 // Obtener detalle de una alerta individual por ID (incluyendo cuerpo HTML completo)
 router.get('/:id', async (req, res) => {
     try {
@@ -74,19 +88,6 @@ router.get('/configurar-correo-prueba', (req, res) => {
     res.json({ correo_prueba_activo: getCorreoPruebaRedireccion() });
 });
 
-// Diagnóstico de Conexión SMTP y Prueba en Vivo
-router.get(['/smtp-status', '/smtp_status'], async (req, res) => {
-    const { crearTransporterSMTP } = require('../services/email.service');
-    const transporter = crearTransporterSMTP();
-    res.json({
-        smtp_configurado: Boolean(transporter),
-        smtp_user: process.env.SMTP_USER || 'No configurado',
-        smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        smtp_port: process.env.SMTP_PORT || 465,
-        test_mode_activo: process.env.SMTP_TEST_MODE === 'true',
-        test_email: process.env.SMTP_TEST_EMAIL || null
-    });
-});
 
 router.post('/enviar-prueba-smtp', async (req, res) => {
     try {
