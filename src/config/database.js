@@ -6,13 +6,27 @@ const fs = require('fs');
 // Configuración de Conexión MySQL Dinámica (Nube / Railway / Render / Local Workbench)
 let MYSQL_CONFIGS = [];
 
-// 1. Si existen variables de entorno de la nube (Railway, Render, AWS, CleverCloud, etc.)
-if (process.env.MYSQLHOST || process.env.DB_HOST || process.env.DATABASE_URL) {
+// 1. Si existe DATABASE_URL o variables estándar de Railway / Nube
+if (process.env.MYSQL_URL || process.env.DATABASE_URL) {
+    const dbUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
+    try {
+        const u = new URL(dbUrl);
+        MYSQL_CONFIGS.push({
+            host: u.hostname,
+            user: u.username,
+            password: u.password,
+            database: u.pathname.replace(/^\//, '') || 'railway',
+            port: parseInt(u.port || '3306')
+        });
+    } catch (e) {}
+}
+
+if (process.env.MYSQLHOST || process.env.DB_HOST) {
     MYSQL_CONFIGS.push({
         host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
         user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
         password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
-        database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'homologacion_db',
+        database: process.env.MYSQLDATABASE || process.env.DB_NAME || 'railway',
         port: parseInt(process.env.MYSQLPORT || process.env.DB_PORT || '3306')
     });
 }
@@ -46,24 +60,19 @@ let isUsingMySQL = false;
 const dbPath = path.join(__dirname, '..', '..', 'database', 'homologacion_db.sqlite');
 const sqliteDb = new sqlite3.Database(dbPath);
 
-// Probar conexión con MySQL Workbench
+// Probar conexión con MySQL Workbench / Nube
 async function initMySQLConnection() {
     for (let cfg of MYSQL_CONFIGS) {
         try {
-            // Intentar conectar sin BD primero para asegurarla
-            const tempConn = await mysql.createConnection({
+            const dbTarget = cfg.database || 'homologacion_db';
+
+            // Intentar conectar con la BD directamente
+            mysqlPool = mysql.createPool({
                 host: cfg.host,
                 user: cfg.user,
                 password: cfg.password,
-                port: cfg.port
-            });
-
-            await tempConn.query(`CREATE DATABASE IF NOT EXISTS homologacion_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-            await tempConn.end();
-
-            // Conectar al Pool oficial en homologacion_db
-            mysqlPool = mysql.createPool({
-                ...cfg,
+                database: dbTarget,
+                port: cfg.port,
                 waitForConnections: true,
                 connectionLimit: 10,
                 queueLimit: 0
@@ -74,18 +83,41 @@ async function initMySQLConnection() {
             if (rows && rows[0].solution === 2) {
                 isUsingMySQL = true;
                 console.log(`=============================================================`);
-                console.log(`🐬 ¡CONECTADO A MYSQL WORKBENCH LOCAL (Local instance MySQL80)!`);
-                console.log(`🗄️ Base de Datos: homologacion_db en localhost:3306 (Usuario: ${cfg.user})`);
+                console.log(`🐬 ¡CONECTADO A MYSQL EXITOSAMENTE!`);
+                console.log(`🗄️ Host: ${cfg.host}:${cfg.port} | BD: ${dbTarget} (Usuario: ${cfg.user})`);
                 console.log(`=============================================================`);
                 await setupMySQLSchemaAndSeeds();
                 return true;
             }
         } catch (err) {
-            // Continuar probando siguiente clave en la lista
+            // Si la base de datos no existe en local, intentar crearla
+            try {
+                const tempConn = await mysql.createConnection({
+                    host: cfg.host,
+                    user: cfg.user,
+                    password: cfg.password,
+                    port: cfg.port
+                });
+                await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${cfg.database || 'homologacion_db'}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+                await tempConn.end();
+
+                mysqlPool = mysql.createPool({
+                    ...cfg,
+                    waitForConnections: true,
+                    connectionLimit: 10,
+                    queueLimit: 0
+                });
+                const [r] = await mysqlPool.query('SELECT 1 + 1 AS solution');
+                if (r && r[0].solution === 2) {
+                    isUsingMySQL = true;
+                    await setupMySQLSchemaAndSeeds();
+                    return true;
+                }
+            } catch (err2) {}
         }
     }
 
-    console.log(`⚠️ No se pudo conectar automáticamente a MySQL. Usando BD SQLite como respaldo.`);
+    console.log(`⚠️ No se pudo conectar a MySQL. Usando BD SQLite como respaldo.`);
     return false;
 }
 
