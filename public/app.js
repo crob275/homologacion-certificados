@@ -1,0 +1,1482 @@
+let chartInstance = null;
+let empresaActivaId = 'emp-1';
+let empresasCache = [];
+let usuarioSesionActivo = null; // Session User Object
+let superAdminScopeCompanyId = null; // Global Scope Filter for Super Admin
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if session exists in localStorage
+    const savedUser = localStorage.getItem('homologa_user_session');
+    if (savedUser) {
+        try {
+            usuarioSesionActivo = JSON.parse(savedUser);
+            iniciarSesionUsuario(usuarioSesionActivo);
+        } catch (e) {
+            localStorage.removeItem('homologa_user_session');
+        }
+    }
+
+    setupDragAndDrop();
+});
+
+function superAdminChangeGlobalScope(empId) {
+    superAdminScopeCompanyId = empId && empId.trim() !== '' ? empId : null;
+    if (superAdminScopeCompanyId) {
+        empresaActivaId = superAdminScopeCompanyId;
+    }
+    loadDashboardKPIs();
+    loadCompanyProfiles();
+    loadCertificados();
+    loadAuditoriaList();
+    if (usuarioSesionActivo && usuarioSesionActivo.rol !== 'OPERADOR') {
+        loadUsuariosList();
+    }
+}
+
+function setupDragAndDrop() {
+    setupZone('pdf-dropzone', 'input-file-pdf', 'pdf');
+    setupZone('excel-dropzone', 'input-file-excel', 'excel');
+}
+
+function setupZone(dropzoneId, inputId, type) {
+    const dropzone = document.getElementById(dropzoneId);
+    const input = document.getElementById(inputId);
+    if (!dropzone || !input) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dropzone-active');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dropzone-active');
+        }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+            input.files = files;
+            handleFileSelected(type);
+        }
+    });
+}
+
+function handleFileSelected(type) {
+    if (type === 'pdf') {
+        const file = document.getElementById('input-file-pdf').files[0];
+        const preview = document.getElementById('pdf-filename-preview');
+        if (preview && file) preview.textContent = `📄 Seleccionado: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    } else if (type === 'excel') {
+        const file = document.getElementById('input-file-excel').files[0];
+        const preview = document.getElementById('excel-filename-preview');
+        if (preview && file) preview.textContent = `📊 Seleccionado: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    }
+}
+
+function filterCertificatesTable() {
+    const filter = document.getElementById('filter-certificados-input').value.toLowerCase();
+    const rows = document.querySelectorAll('#tbody-certificados tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+    });
+}
+
+// LOGIN AUTHENTICATION HANDLERS CON CAMBIO OBLIGATORIO DE CONTRASEÑA EN BD
+let pendingLoginUser = null;
+
+async function handleUserLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+
+    try {
+        const res = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Credenciales inválidas.');
+
+        pendingLoginUser = data.user;
+
+        // Si el usuario debe cambiar su contraseña obligatoriamente (primer ingreso o reset)
+        if (data.debe_cambiar_password) {
+            document.getElementById('change-pass-user-id').value = data.user.id;
+            document.getElementById('modal-cambio-password').style.display = 'flex';
+            return;
+        }
+
+        localStorage.setItem('homologa_user_session', JSON.stringify(data.user));
+        iniciarSesionUsuario(data.user);
+    } catch (err) {
+        alert('Error de inicio de sesión: ' + err.message);
+    }
+}
+
+async function handleObligatoryPasswordChange(e) {
+    e.preventDefault();
+    const userId = document.getElementById('change-pass-user-id').value;
+    const pass1 = document.getElementById('modal-pass-nuevo').value;
+    const pass2 = document.getElementById('modal-pass-confirm').value;
+
+    if (pass1 !== pass2) {
+        return alert('Las contraseñas no coinciden. Por favor verifique.');
+    }
+
+    try {
+        const res = await fetch('/api/v1/auth/cambiar-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id: userId, password_nuevo: pass1 })
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Error cambiando contraseña.');
+
+        alert(data.message);
+        document.getElementById('modal-cambio-password').style.display = 'none';
+
+        if (pendingLoginUser) {
+            pendingLoginUser.debe_cambiar_password = false;
+            localStorage.setItem('homologa_user_session', JSON.stringify(pendingLoginUser));
+            iniciarSesionUsuario(pendingLoginUser);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+function quickLogin(email, password) {
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-password').value = password || 'Admin2026!';
+    document.getElementById('formLogin').dispatchEvent(new Event('submit'));
+}
+
+function selectPresetLogo(logo) {
+    document.getElementById('modal-logo').value = logo;
+}
+
+function esUsuarioEmpresa() {
+    return Boolean(usuarioSesionActivo && usuarioSesionActivo.empresa_id);
+}
+
+function iniciarSesionUsuario(user) {
+    usuarioSesionActivo = user;
+    if (user.empresa_id) {
+        empresaActivaId = user.empresa_id;
+    }
+
+    // Hide Login Screen, Show Main App
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-main-content').style.display = 'block';
+
+    // Apply Corporate Branding to Header
+    const logoIconElem = document.querySelector('.header-container .logo-icon');
+    const logoTitleElem = document.querySelector('.header-container .logo-text h1');
+    const logoSubElem = document.querySelector('.header-container .logo-text p');
+
+    const isCompanyUser = (user.rol === 'CONTRATISTA' || user.rol === 'OPERADOR') && user.empresa_nombre;
+    if (isCompanyUser) {
+        if (logoIconElem) logoIconElem.textContent = user.empresa_logo || '🏢';
+        if (logoTitleElem) logoTitleElem.textContent = `Portal Contratista: ${user.empresa_nombre}`;
+        if (logoSubElem) logoSubElem.textContent = user.rol === 'OPERADOR' 
+            ? `📄 Operador de Carga & Habilitación | ${user.email}` 
+            : `🏗️ Administración de Empresa & HSE | ${user.email}`;
+    } else {
+        if (logoIconElem) logoIconElem.textContent = '⛏️';
+        if (logoTitleElem) logoTitleElem.textContent = 'HomologaControl Minería';
+        if (logoSubElem) logoSubElem.textContent = '⛰️ Control de Homologaciones Mineras, HSE & Pases de Ingreso a Planta';
+    }
+
+    // Render User Badge in Header
+    const badgeBox = document.getElementById('user-session-badge');
+    const roleIcon = user.rol === 'ADMINISTRADOR' ? '👑' : (user.rol === 'SUPERVISOR' ? '🔍' : (user.rol === 'CONTRATISTA' ? '🏗️' : '📄'));
+    const roleLabel = user.rol === 'ADMINISTRADOR' ? 'ADMINISTRADOR' : (user.rol === 'SUPERVISOR' ? 'SUPERVISOR' : (user.rol === 'CONTRATISTA' ? 'ADMIN EMPRESA' : 'OPERADOR CARGA'));
+    const companyLabel = user.empresa_nombre ? `${user.empresa_logo || '🏢'} ${user.empresa_nombre}` : '🏛️ Acceso Global';
+    
+    badgeBox.innerHTML = `
+        <div class="user-info-text">
+            <strong>${roleIcon} ${user.nombre_completo}</strong> <span class="badge badge-info" style="font-size: 0.7rem;">${roleLabel}</span><br>
+            <small style="color: var(--text-secondary)">${companyLabel}</small>
+        </div>
+        <button class="btn-logout" onclick="logoutUser()">🚪 Salir</button>
+    `;
+
+    // Apply Privileges according to User Role
+    aplicarPrivilegiosRol(user.rol);
+
+    // Initial Data Loads
+    loadDashboardKPIs();
+    loadCompanyProfiles();
+    loadCertificados();
+    loadAuditoriaList();
+    if (user.rol !== 'OPERADOR') {
+        loadUsuariosList();
+    }
+    if (user.rol === 'ADMINISTRADOR') {
+        loadPowerBIPreview();
+    }
+}
+
+function logoutUser() {
+    localStorage.removeItem('homologa_user_session');
+    usuarioSesionActivo = null;
+    document.getElementById('app-main-content').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+}
+
+// PRIVILEGES & UI ROLES ENFORCEMENT (RBAC)
+function aplicarPrivilegiosRol(rol) {
+    const btnAddEmp = document.getElementById('btn-open-company-modal');
+    const btnEditEmp = document.getElementById('btn-edit-active-company');
+    const tabSupervisorBtn = document.getElementById('tab-btn-supervisor');
+    const tabUsuariosBtn = document.getElementById('tab-btn-usuarios');
+    const tabPowerBIBtn = document.getElementById('tab-btn-powerbi');
+    const scopeBar = document.getElementById('superadmin-scope-bar');
+
+    // Si el usuario tiene una empresa específica asignada, NUNCA debe ver la barra de cambio de alcance global
+    const esGlobal = !usuarioSesionActivo || !usuarioSesionActivo.empresa_id;
+
+    if (scopeBar) {
+        scopeBar.style.display = (esGlobal && (rol === 'ADMINISTRADOR' || rol === 'SUPERVISOR')) ? 'flex' : 'none';
+    }
+
+    if (rol === 'ADMINISTRADOR') {
+        if (btnAddEmp) btnAddEmp.style.display = esGlobal ? 'inline-block' : 'none';
+        if (btnEditEmp) btnEditEmp.style.display = 'inline-block';
+        if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'inline-block';
+        if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block';
+        if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'inline-block';
+    } else if (rol === 'SUPERVISOR') {
+        if (btnAddEmp) btnAddEmp.style.display = 'none';
+        if (btnEditEmp) btnEditEmp.style.display = 'none';
+        if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'inline-block';
+        if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none';
+        if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+    } else if (rol === 'CONTRATISTA') {
+        if (btnAddEmp) btnAddEmp.style.display = 'none';
+        if (btnEditEmp) btnEditEmp.style.display = 'none';
+        if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'none';
+        if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block'; // Admin de empresa administra usuarios de su contratista
+        if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+    } else if (rol === 'OPERADOR') {
+        if (btnAddEmp) btnAddEmp.style.display = 'none';
+        if (btnEditEmp) btnEditEmp.style.display = 'none';
+        if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'none';
+        if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none'; // OPERADOR DE CARGA NO TIENE ACCESO A USUARIOS & ROLES
+        if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+    }
+}
+
+// ==============================================================================
+// GESTIÓN DE USUARIOS Y ROLES (ADMINISTRACIÓN DE ACCESOS EN BD REAL)
+// ==============================================================================
+
+async function loadUsuariosList() {
+    try {
+        let url = '/api/v1/usuarios';
+        if (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA' && usuarioSesionActivo.empresa_id) {
+            url += '?empresa_id=' + usuarioSesionActivo.empresa_id;
+        }
+
+        const res = await fetch(url);
+        const users = await res.json();
+
+        const tbody = document.getElementById('tbody-usuarios');
+        if (!tbody) return;
+
+        if (users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No hay usuarios registrados aún para esta empresa.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+            const roleBadge = u.rol === 'ADMINISTRADOR' ? 'badge-warning' : (u.rol === 'SUPERVISOR' ? 'badge-info' : 'badge-success');
+            const empresaStr = u.empresa_nombre ? `${u.empresa_logo || '🏢'} ${u.empresa_nombre}` : '🏛️ Acceso Global (Todas)';
+            const passStatusBadge = u.debe_cambiar_password 
+                ? `<span class="badge badge-danger" style="font-size: 0.65rem; margin-left: 0.3rem;">🔐 Cambio Pendiente</span>`
+                : `<span class="badge badge-success" style="font-size: 0.65rem; margin-left: 0.3rem;">✓ Clave Privada</span>`;
+            return `
+                <tr>
+                    <td><strong>${u.nombre_completo}</strong> ${passStatusBadge}</td>
+                    <td><code>${u.email}</code></td>
+                    <td><span class="badge ${roleBadge}">${u.rol}</span></td>
+                    <td><small style="color: var(--text-primary); font-weight: 600;">${empresaStr}</small></td>
+                    <td>${u.cargo || 'Gestor'}</td>
+                    <td><small style="color: var(--text-secondary);">${u.ultimo_login ? new Date(u.ultimo_login).toLocaleString() : 'Pendiente'}</small></td>
+                    <td>
+                        <button class="btn-warning" onclick="openEditUserModal('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">✏️ Editar</button>
+                        <button class="btn-primary" onclick="resetUserPassword('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: linear-gradient(135deg, #f59e0b, #d97706); margin-left: 0.25rem;">🔑 Reset Clave</button>
+                        ${u.rol !== 'ADMINISTRADOR' ? `<button class="btn-danger" onclick="deleteUser('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; cursor: pointer; margin-left: 0.25rem;">🗑️ Eliminar</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error cargando usuarios:', err);
+    }
+}
+
+async function resetUserPassword(userId) {
+    const tempPass = prompt('Ingrese la nueva contraseña temporal para este usuario:', 'Temp2026!');
+    if (!tempPass) return;
+
+    try {
+        const res = await fetch(`/api/v1/usuarios/${userId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password_temporal: tempPass })
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Error al reiniciar contraseña.');
+
+        alert(data.message);
+        loadUsuariosList();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function openUserModal() {
+    document.getElementById('modal-usuario-id').value = '';
+    document.getElementById('modal-usuario-title').textContent = (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA')
+        ? '➕ Registrar Nuevo Usuario / Responsable de Su Empresa'
+        : '➕ Registrar Nuevo Usuario y Asignar Rol';
+    document.getElementById('formUsuarioModal').reset();
+
+    const selectEmpresa = document.getElementById('modal-user-empresa');
+    const selectRol = document.getElementById('modal-user-rol');
+
+    // Populate Companies dropdown
+    const res = await fetch('/api/v1/empresas');
+    const empresas = await res.json();
+
+    if (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA' && usuarioSesionActivo.empresa_id) {
+        const empPropia = empresas.find(e => e.id === usuarioSesionActivo.empresa_id);
+        selectEmpresa.innerHTML = `<option value="${usuarioSesionActivo.empresa_id}" selected>${empPropia ? (empPropia.logo_icon + ' ' + empPropia.razon_social) : 'Su Empresa Contratista'}</option>`;
+        selectEmpresa.disabled = true;
+
+        selectRol.innerHTML = `
+            <option value="OPERADOR" selected>📄 OPERADOR DE CARGA (Solo Subir Certificados - Sin Acceso a Usuarios)</option>
+            <option value="CONTRATISTA">🏗️ GESTOR DE EMPRESA (Admin de Empresa - Con Acceso a Usuarios)</option>
+        `;
+        selectRol.disabled = false;
+    } else {
+        selectEmpresa.innerHTML = `<option value="">🏛️ Acceso Global (Sin Restricción por Empresa)</option>` + 
+            empresas.map(e => `<option value="${e.id}">${e.logo_icon || '🏢'} ${e.razon_social}</option>`).join('');
+        selectEmpresa.disabled = false;
+
+        selectRol.innerHTML = `
+            <option value="ADMINISTRADOR">👑 ADMINISTRADOR GENERAL (Acceso Total Global)</option>
+            <option value="SUPERVISOR">🔍 SUPERVISOR AUDITOR HSE (Auditoría & Aprobación)</option>
+            <option value="CONTRATISTA">🏗️ GESTOR DE EMPRESA (Admin de Empresa - Con Acceso a Usuarios)</option>
+            <option value="OPERADOR" selected>📄 OPERADOR DE CARGA (Solo Subir Certificados - Sin Acceso a Usuarios)</option>
+        `;
+        selectRol.disabled = false;
+    }
+
+    document.getElementById('modal-usuario').style.display = 'flex';
+}
+
+async function openEditUserModal(userId) {
+    const res = await fetch('/api/v1/usuarios');
+    const users = await res.json();
+    const u = users.find(x => x.id === userId);
+    if (!u) return alert('Usuario no encontrado.');
+
+    document.getElementById('modal-usuario-id').value = u.id;
+    document.getElementById('modal-usuario-title').textContent = `✏️ Editar Usuario: ${u.nombre_completo}`;
+    document.getElementById('modal-user-nombre').value = u.nombre_completo;
+    document.getElementById('modal-user-email').value = u.email;
+    document.getElementById('modal-user-password').value = '';
+    document.getElementById('modal-user-cargo').value = u.cargo || '';
+
+    const resEmp = await fetch('/api/v1/empresas');
+    const empresas = await resEmp.json();
+    const selectEmpresa = document.getElementById('modal-user-empresa');
+    const selectRol = document.getElementById('modal-user-rol');
+
+    if (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA') {
+        const empPropia = empresas.find(e => e.id === usuarioSesionActivo.empresa_id);
+        selectEmpresa.innerHTML = `<option value="${usuarioSesionActivo.empresa_id}" selected>${empPropia ? (empPropia.logo_icon + ' ' + empPropia.razon_social) : 'Su Empresa Contratista'}</option>`;
+        selectEmpresa.disabled = true;
+
+        selectRol.innerHTML = `
+            <option value="OPERADOR" ${u.rol === 'OPERADOR' ? 'selected' : ''}>📄 OPERADOR DE CARGA (Solo Subir Certificados - Sin Acceso a Usuarios)</option>
+            <option value="CONTRATISTA" ${u.rol === 'CONTRATISTA' ? 'selected' : ''}>🏗️ GESTOR DE EMPRESA (Admin de Empresa - Con Acceso a Usuarios)</option>
+        `;
+        selectRol.disabled = false;
+    } else {
+        selectEmpresa.innerHTML = `<option value="">🏛️ Acceso Global (Sin Restricción por Empresa)</option>` + 
+            empresas.map(e => `<option value="${e.id}" ${e.id === u.empresa_id ? 'selected' : ''}>${e.logo_icon || '🏢'} ${e.razon_social}</option>`).join('');
+        selectEmpresa.disabled = false;
+
+        selectRol.innerHTML = `
+            <option value="ADMINISTRADOR" ${u.rol === 'ADMINISTRADOR' ? 'selected' : ''}>👑 ADMINISTRADOR GENERAL (Acceso Total Global)</option>
+            <option value="SUPERVISOR" ${u.rol === 'SUPERVISOR' ? 'selected' : ''}>🔍 SUPERVISOR AUDITOR HSE (Auditoría & Aprobación)</option>
+            <option value="CONTRATISTA" ${u.rol === 'CONTRATISTA' ? 'selected' : ''}>🏗️ GESTOR DE EMPRESA (Admin de Empresa - Con Acceso a Usuarios)</option>
+            <option value="OPERADOR" ${u.rol === 'OPERADOR' ? 'selected' : ''}>📄 OPERADOR DE CARGA (Solo Subir Certificados - Sin Acceso a Usuarios)</option>
+        `;
+        selectRol.disabled = false;
+    }
+
+    document.getElementById('modal-usuario').style.display = 'flex';
+}
+
+function closeUserModal() {
+    document.getElementById('modal-usuario').style.display = 'none';
+}
+
+async function handleSaveUser(e) {
+    e.preventDefault();
+    const id = document.getElementById('modal-usuario-id').value;
+    const selectEmpresa = document.getElementById('modal-user-empresa');
+    const selectRol = document.getElementById('modal-user-rol');
+
+    const targetEmpresaId = (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA')
+        ? usuarioSesionActivo.empresa_id
+        : (selectEmpresa.value || null);
+
+    const targetRol = selectRol.value;
+
+    const bodyData = {
+        nombre_completo: document.getElementById('modal-user-nombre').value,
+        email: document.getElementById('modal-user-email').value,
+        password: document.getElementById('modal-user-password').value || 'demo123',
+        rol: targetRol,
+        empresa_id: targetEmpresaId,
+        cargo: document.getElementById('modal-user-cargo').value
+    };
+
+    try {
+        const url = id ? `/api/v1/usuarios/${id}` : '/api/v1/usuarios';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData)
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Error guardando usuario');
+
+        alert(data.message || 'Usuario y Rol guardado en BD exitosamente.');
+        closeUserModal();
+        loadUsuariosList();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('¿Está seguro de eliminar este usuario de la Base de Datos?')) return;
+    try {
+        const res = await fetch(`/api/v1/usuarios/${userId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario.');
+        alert('Usuario eliminado correctamente.');
+        loadUsuariosList();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// RBAC Role Switcher Handler
+function switchUserRole(role) {
+    rolUsuarioActivo = role;
+    const banner = document.getElementById('active-company-banner');
+    loadCompanyProfiles();
+    loadCertificados();
+    alert(`🔑 Rol cambiado a: ${role}. La interfaz ha actualizado los permisos corporativos.`);
+}
+
+// Company Modal Handlers (CRUD BD Real)
+function openCompanyModal() {
+    document.getElementById('modal-empresa-id').value = '';
+    document.getElementById('modal-empresa-title').textContent = '➕ Registrar Nueva Empresa Contratista';
+    document.getElementById('formEmpresaModal').reset();
+    document.getElementById('modal-empresa').style.display = 'flex';
+}
+
+function openEditActiveCompanyModal() {
+    const activeEmp = empresasCache.find(e => e.id === empresaActivaId);
+    if (!activeEmp) return alert('Seleccione una empresa primero.');
+
+    document.getElementById('modal-empresa-id').value = activeEmp.id;
+    document.getElementById('modal-empresa-title').textContent = `✏️ Editar Empresa: ${activeEmp.razon_social}`;
+    document.getElementById('modal-ruc').value = activeEmp.ruc_rut || '';
+    document.getElementById('modal-razon').value = activeEmp.razon_social || '';
+    document.getElementById('modal-comercial').value = activeEmp.nombre_comercial || '';
+    document.getElementById('modal-logo').value = activeEmp.logo_icon || '🏢';
+    document.getElementById('modal-email').value = activeEmp.email_contacto || activeEmp.email || '';
+    document.getElementById('modal-telefono').value = activeEmp.telefono_contacto || '';
+    document.getElementById('modal-persona').value = activeEmp.contacto_persona || '';
+    document.getElementById('modal-rubro').value = activeEmp.rubro || '';
+    document.getElementById('modal-direccion').value = activeEmp.direccion || '';
+
+    document.getElementById('modal-empresa').style.display = 'flex';
+}
+
+function closeCompanyModal() {
+    document.getElementById('modal-empresa').style.display = 'none';
+}
+
+async function handleSaveCompany(e) {
+    e.preventDefault();
+    const id = document.getElementById('modal-empresa-id').value;
+    const bodyData = {
+        ruc_rut: document.getElementById('modal-ruc').value,
+        razon_social: document.getElementById('modal-razon').value,
+        nombre_comercial: document.getElementById('modal-comercial').value,
+        logo_icon: document.getElementById('modal-logo').value,
+        email_contacto: document.getElementById('modal-email').value,
+        telefono_contacto: document.getElementById('modal-telefono').value,
+        contacto_persona: document.getElementById('modal-persona').value,
+        rubro: document.getElementById('modal-rubro').value,
+        direccion: document.getElementById('modal-direccion').value
+    };
+
+    try {
+        const url = id ? `/api/v1/empresas/${id}` : '/api/v1/empresas';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData)
+        });
+        const result = await res.json();
+
+        if (!res.ok) throw new Error(result.error || 'Error al guardar empresa');
+
+        alert(result.message || 'Empresa guardada en BD exitosamente.');
+        closeCompanyModal();
+        loadCompanyProfiles();
+        loadDashboardKPIs();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Tab Switching Logic
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    event.target.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+
+    if (tabId === 'dashboard') loadDashboardKPIs();
+    if (tabId === 'contratista') {
+        loadCertificados();
+    }
+    if (tabId === 'supervisor') loadAuditoriaList();
+    if (tabId === 'cron') loadAlertasLog();
+    if (tabId === 'powerbi') loadPowerBIPreview();
+}
+
+// 1. Load Dashboard KPIs & Render Chart
+async function loadDashboardKPIs() {
+    try {
+        let url = '/api/v1/dashboard/kpis';
+        const empTarget = esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : superAdminScopeCompanyId;
+        if (empTarget) {
+            url += '?empresa_id=' + empTarget;
+        }
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const isCompany = Boolean(empTarget);
+        document.getElementById('kpi-empresas').textContent = isCompany ? '1' : data.totalEmpresas;
+        document.getElementById('kpi-habilitados').textContent = data.habilitados;
+        document.getElementById('kpi-proximos').textContent = data.proximosVencer;
+        document.getElementById('kpi-inhabilitados').textContent = data.inhabilitados;
+        document.getElementById('badge-cumplimiento-global').textContent = isCompany 
+            ? `Cumplimiento de Empresa Seleccionada: ${data.tasaCumplimiento}%` 
+            : `Cumplimiento Global: ${data.tasaCumplimiento}%`;
+
+        // Render Table per Company with High-End Progress Bar
+        const tbody = document.getElementById('tbody-empresas-kpi');
+        tbody.innerHTML = data.resumenEmpresas.map(emp => {
+            const barClass = emp.cumplimiento >= 80 ? 'green' : (emp.cumplimiento >= 50 ? 'amber' : 'red');
+            const textColor = emp.cumplimiento >= 80 ? '#34d399' : (emp.cumplimiento >= 50 ? '#fbbf24' : '#fb7185');
+            return `
+                <tr>
+                    <td><strong>${emp.empresa}</strong></td>
+                    <td><strong style="color: var(--text-primary); font-size: 0.95rem;">${emp.total}</strong></td>
+                    <td><span class="badge badge-success">✓ ${emp.habilitados}</span></td>
+                    <td><span class="badge badge-warning">⚠️ ${emp.proximos}</span></td>
+                    <td><span class="badge badge-danger">⛔ ${emp.inhabilitados}</span></td>
+                    <td>
+                        <div class="progress-bar-container">
+                            <div class="progress-track">
+                                <div class="progress-fill ${barClass}" style="width: ${emp.cumplimiento}%"></div>
+                            </div>
+                            <span class="progress-text" style="color: ${textColor}">${emp.cumplimiento}%</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Render Donut Chart
+        renderChart(data.habilitados, data.proximosVencer, data.inhabilitados);
+    } catch (err) {
+        console.error('Error loading KPIs:', err);
+    }
+}
+
+function renderChart(hab, prox, inhab) {
+    const ctx = document.getElementById('chartStatus').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Habilitado (Acceso Autorizado)', 'Próximo a Vencer (≤90d Alerta)', 'Inhabilitado (Restringido)'],
+            datasets: [{
+                data: [hab, prox, inhab],
+                backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'],
+                borderColor: '#0f172a',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#f8fafc', font: { family: 'Inter', weight: '700' } } }
+            }
+        }
+    });
+}
+
+// 1.5 Load Company Profiles & Handle Switcher
+async function loadCompanyProfiles() {
+    try {
+        let url = '/api/v1/empresas';
+        if (esUsuarioEmpresa()) {
+            url += '?empresa_id=' + usuarioSesionActivo.empresa_id;
+        }
+
+        const res = await fetch(url);
+        empresasCache = await res.json();
+
+        // Populate Super Admin Scope & Auditoría dropdowns
+        const scopeSelect = document.getElementById('select-global-scope-company');
+        const auditEmpSelect = document.getElementById('filter-audit-empresa');
+
+        if (scopeSelect && Array.isArray(empresasCache)) {
+            scopeSelect.innerHTML = `<option value="">🏛️ VISIÓN GLOBAL DE LA MINA (Todas las Empresas Proveedoras)</option>` + 
+                empresasCache.map(e => `<option value="${e.id}" ${e.id === superAdminScopeCompanyId ? 'selected' : ''}>${e.logo_icon || '🏢'} ${e.razon_social}</option>`).join('');
+        }
+
+        if (auditEmpSelect && Array.isArray(empresasCache)) {
+            const currentVal = auditEmpSelect.value;
+            auditEmpSelect.innerHTML = `<option value="">🏢 Todas las Contratistas</option>` + 
+                empresasCache.map(e => `<option value="${e.id}" ${e.id === currentVal ? 'selected' : ''}>${e.logo_icon || '🏢'} ${e.razon_social}</option>`).join('');
+        }
+
+        const grid = document.getElementById('company-profiles-grid');
+        const secTitle = document.getElementById('company-section-title');
+        const secDesc = document.getElementById('company-section-desc');
+        const secCard = document.getElementById('company-section-card');
+
+        if (esUsuarioEmpresa()) {
+            if (secCard) secCard.style.display = 'none'; // Ocultar bloque redundante de empresa para cualquier rol de contratista
+        } else {
+            if (secCard) secCard.style.display = 'block';
+            if (grid) grid.style.display = 'grid';
+            if (secDesc) secDesc.style.display = 'block';
+            if (secTitle) secTitle.textContent = '🏢 Perfiles de Empresas Proveedoras / Contratistas Mineras';
+
+            if (grid) {
+                grid.innerHTML = empresasCache.map(emp => {
+                    const isActive = emp.id === (superAdminScopeCompanyId || empresaActivaId);
+                    return `
+                        <div class="company-card ${isActive ? 'active' : ''}" onclick="selectCompanyProfile('${emp.id}')">
+                            <div class="company-logo">${emp.logo_icon || '🏢'}</div>
+                            <div class="company-details">
+                                <h3>${emp.nombre_comercial || emp.razon_social}</h3>
+                                <p><strong>RUC:</strong> ${emp.ruc_rut} | ${emp.rubro || 'Contratista Minero'}</p>
+                                <div class="company-meta-tags">
+                                    <span class="badge badge-info">${emp.total_trabajadores} Personal</span>
+                                    <span class="badge badge-success">${emp.trabajadores_habilitados} Habilitados</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        updateActiveCompanyBanner();
+    } catch (err) {
+        console.error('Error loading company profiles:', err);
+    }
+}
+
+function selectCompanyProfile(empId) {
+    empresaActivaId = empId;
+    loadCompanyProfiles();
+    loadCertificados(); // Filter certificates by active company
+}
+
+function updateActiveCompanyBanner() {
+    const activeEmp = empresasCache.find(e => e.id === empresaActivaId) || empresasCache[0];
+    if (!activeEmp) return;
+
+    const banner = document.getElementById('active-company-banner');
+    if (banner) {
+        banner.style.display = 'flex';
+        document.getElementById('banner-logo').textContent = activeEmp.logo_icon || '🏢';
+        document.getElementById('banner-razon-social').textContent = activeEmp.razon_social;
+        document.getElementById('banner-details').textContent = `RUC: ${activeEmp.ruc_rut} | Rubro: ${activeEmp.rubro || 'Contratista Minero'} | Contacto: ${activeEmp.contacto_persona || 'Gestor HSE'}`;
+        
+        const emailOficial = activeEmp.email_contacto || activeEmp.email || 'contacto@empresa.com';
+        const telefonoOficial = activeEmp.telefono_contacto || '+51 900000000';
+        document.getElementById('banner-contacts').innerHTML = `✉️ Correo Oficial: <code>${emailOficial}</code> | 📞 Teléfono: <strong>${telefonoOficial}</strong>`;
+        document.getElementById('banner-worker-count').textContent = `👥 ${activeEmp.total_trabajadores || 0} Trabajadores Registrados`;
+    }
+}
+
+// 3. Handle Single PDF Smart OCR Upload & Auto DB Lookup
+async function handleCertificateUpload(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('input-file-pdf');
+    if (!fileInput.files[0]) {
+        return alert('Por favor seleccione un archivo PDF.');
+    }
+
+    const formData = new FormData();
+    formData.append('pdfFile', fileInput.files[0]);
+    formData.append('empresa_id', empresaActivaId); // Scope to currently active company profile
+
+    try {
+        const res = await fetch('/api/v1/certificados/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+            throw new Error(result.error || 'Error procesando archivo PDF.');
+        }
+
+        const ocrBox = document.getElementById('ocr-console');
+        const ocrText = document.getElementById('ocr-output-text');
+        ocrBox.style.display = 'block';
+
+        const bd = result.datos_vinculados_bd;
+        const meta = result.metadatos_extraidos_pdf;
+
+        const badgeNuevo = result.discrepancia_detectada
+            ? `<div style="background: #fef3c7; color: #92400e; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.75rem; border: 1px solid #f59e0b;">
+                ⚠️ ALERTA DE DISCREPANCIA EN AUDITORÍA:<br>
+                <span style="font-weight: normal; font-size: 0.8rem;">El nombre extraído en el PDF difiere parcialmente de la Ficha Maestra en BD. Requiere verificación por Supervisor HSE.</span>
+               </div>`
+            : (result.es_nuevo_trabajador 
+                ? `<span class="badge badge-success" style="font-size: 0.85rem; margin-bottom: 0.5rem; display: inline-block;">🆕 ¡NUEVO TRABAJADOR REGISTRADO EN EL PERFIL DE ESTA EMPRESA!</span><br>`
+                : `<span class="badge badge-info" style="font-size: 0.85rem; margin-bottom: 0.5rem; display: inline-block;">👤 TRABAJADOR EXISTENTE ENCONTRADO EN BD</span><br>`);
+
+        ocrText.innerHTML = `
+            ${badgeNuevo}
+            ✓ <strong>TRABAJADOR DETECTADO EN PDF:</strong> ${bd.trabajador_nombres} (DNI: ${bd.trabajador_documento})<br>
+            ✓ <strong>CARGO ASIGNADO EN BD:</strong> ${bd.trabajador_cargo}<br>
+            ✓ <strong>CORREO PERSONAL DEL TRABAJADOR:</strong> <code>${bd.trabajador_email_personal}</code><br>
+            ✓ <strong>EMPRESA CONTRATISTA VINCULADA:</strong> <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc})<br>
+            ✓ <strong>CORREO OFICIAL DE LA EMPRESA:</strong> <code>${bd.empresa_email_contacto}</code><br>
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 0.5rem 0;">
+            ✓ <strong>CURSO RECONOCIDO EN PDF:</strong> <strong>${meta.curso}</strong> (${meta.horas} hrs)<br>
+            ✓ <strong>ENTIDAD EMISORA RECONOCIDA:</strong> ${meta.entidad}<br>
+            ✓ <strong>FECHA EMISIÓN PDF:</strong> ${meta.fecha_emision} &rarr; <strong>FECHA VENCIMIENTO (1 AÑO): ${meta.fecha_vencimiento_calculada}</strong><br>
+            ✓ <strong>CÓDIGO QR / REGISTRO DIGITAL:</strong> <code>${meta.codigo_qr_validado}</code>
+        `;
+
+        loadCertificados();
+        loadDashboardKPIs();
+        loadCompanyProfiles();
+    } catch (err) {
+        alert('Error en carga de PDF: ' + err.message);
+    }
+}
+
+// 3.5 Handle Excel Batch Upload Method
+let ultimosEnviosExcel = null;
+
+function verPreviewReporteEmpresaExcel() {
+    if (!ultimosEnviosExcel || !ultimosEnviosExcel.reporte_empresa) return alert('No hay reporte consolidado de empresa disponible.');
+    mostrarModalPreviewHTML({
+        asunto: ultimosEnviosExcel.reporte_empresa.asunto,
+        email_destino_final: `${ultimosEnviosExcel.reporte_empresa.email_empresa} (CC: ${ultimosEnviosExcel.reporte_empresa.email_responsable})`,
+        cuerpo_html: ultimosEnviosExcel.reporte_empresa.cuerpo_html
+    });
+}
+
+function verPreviewTrabajadorExcel(index) {
+    if (!ultimosEnviosExcel || !ultimosEnviosExcel.detalles_envios || !ultimosEnviosExcel.detalles_envios[index]) return alert('No hay correo disponible.');
+    const envio = ultimosEnviosExcel.detalles_envios[index];
+    mostrarModalPreviewHTML({
+        asunto: envio.asunto,
+        email_destino_final: envio.trabajador_email,
+        cuerpo_html: envio.cuerpo_html
+    });
+}
+
+async function handleExcelUpload(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('input-file-excel');
+    if (!fileInput.files[0]) {
+        return alert('Por favor seleccione un archivo Excel o CSV.');
+    }
+
+    const submitBtn = document.getElementById('btn-submit-excel');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⏳ Procesando carga y protegiendo anti-duplicados...';
+        submitBtn.style.opacity = '0.75';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+
+    const formData = new FormData();
+    formData.append('excelFile', fileInput.files[0]);
+    const empTarget = (usuarioSesionActivo && usuarioSesionActivo.empresa_id) ? usuarioSesionActivo.empresa_id : empresaActivaId;
+    if (empTarget) formData.append('empresa_id', empTarget);
+
+    if (usuarioSesionActivo) {
+        formData.append('usuario_id', usuarioSesionActivo.id);
+        formData.append('usuario_nombre', usuarioSesionActivo.nombre_completo);
+        formData.append('usuario_rol', usuarioSesionActivo.rol);
+        formData.append('usuario_email', usuarioSesionActivo.email);
+    }
+
+    try {
+        const res = await fetch('/api/v1/certificados/carga-masiva-excel', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+            throw new Error(result.error || 'Error procesando archivo Excel.');
+        }
+
+        ultimosEnviosExcel = result;
+
+        const excelBox = document.getElementById('excel-console');
+        const excelText = document.getElementById('excel-output-text');
+        excelBox.style.display = 'block';
+
+        let erroresHTML = '';
+        if (result.errores && result.errores.length > 0) {
+            erroresHTML = `<div style="color: var(--danger); margin-top: 8px; font-size: 0.85rem;">⚠️ ADVERTENCIAS EN FILAS:<br>${result.errores.join('<br>')}</div>`;
+        }
+
+        const aptosCount = result.resumen_estados ? result.resumen_estados.aptos : 0;
+        const proxCount = result.resumen_estados ? result.resumen_estados.por_vencer : 0;
+        const vencCount = result.resumen_estados ? result.resumen_estados.vencidos : 0;
+        const duplOmitidos = result.duplicados_omitidos || 0;
+        const trabsActualizados = result.trabajadores_actualizados || 0;
+
+        const bannerAntiDuplicados = (duplOmitidos > 0 || trabsActualizados > 0) ? `
+            <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.82rem; color: #bae6fd;">
+                🛡️ <strong>Control de Integridad Anti-Duplicados:</strong> Se omitieron <strong>${duplOmitidos}</strong> filas duplicadas del archivo y se actualizaron <strong>${trabsActualizados}</strong> registros existentes sin duplicar personal en la base de datos.
+            </div>
+        ` : '';
+
+        const reportEmpresaHTML = result.reporte_empresa ? `
+            <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 8px; padding: 12px; margin: 12px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <strong style="color: #38bdf8; font-size: 0.95rem;">🏢 Reporte Consolidado Enviado a la Empresa Contratista:</strong><br>
+                        <span style="font-size: 0.82rem; color: #cbd5e1;">Destinatario: <code style="color: #38bdf8;">${result.reporte_empresa.email_empresa}</code> &bull; Con Copia (CC - Responsable de Carga): <code style="color: #34d399;">${result.reporte_empresa.email_responsable}</code></span>
+                    </div>
+                    <button type="button" class="btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.85rem; background: #0284c7; border: none; cursor: pointer;" onclick="verPreviewReporteEmpresaExcel()">👁️ Previsualizar Correo Empresa</button>
+                </div>
+            </div>
+        ` : '';
+
+        const filasCorreosTrab = (result.detalles_envios || []).map((envio, i) => {
+            const badgeColor = envio.estado === 'APTO' ? '#10b981' : (envio.estado === 'POR_VENCER' ? '#f59e0b' : '#f43f5e');
+            const estadoLabel = envio.estado === 'APTO' ? '✓ APTO' : (envio.estado === 'POR_VENCER' ? `⚠️ POR VENCER (${envio.dias_restantes}d)` : '⛔ NO APTO (VENCIDO)');
+
+            return `
+                <div style="background: #1e293b; border-left: 4px solid ${badgeColor}; padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div>
+                        <strong style="color: #fff; font-size: 0.88rem;">👤 ${envio.trabajador_nombre}</strong> <span style="color: #94a3b8; font-size: 0.8rem;">(Doc: ${envio.trabajador_doc})</span><br>
+                        <span style="color: #38bdf8; font-size: 0.8rem;">✉️ ${envio.trabajador_email}</span> &bull; <strong style="color: ${badgeColor}; font-size: 0.8rem;">${estadoLabel}</strong>
+                    </div>
+                    <button type="button" class="btn-primary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; background: #334155; border: 1px solid #475569; cursor: pointer;" onclick="verPreviewTrabajadorExcel(${i})">👁️ Ver Correo</button>
+                </div>
+            `;
+        }).join('');
+
+        excelText.innerHTML = `
+            <div style="color: #34d399; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">
+                ✅ ¡CARGA MASIVA COMPLETADA Y NOTIFICACIONES DE CORREO ENVIADAS!
+            </div>
+
+            ${bannerAntiDuplicados}
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                <div style="background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                    <small style="color: #94a3b8; display: block;">Filas Procesadas</small>
+                    <strong style="font-size: 1.15rem; color: #fff;">${result.total_filas_procesadas}</strong>
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.15); padding: 8px 12px; border-radius: 6px; border: 1px solid #10b981; text-align: center;">
+                    <small style="color: #a7f3d0; display: block;">✓ Aptos</small>
+                    <strong style="font-size: 1.15rem; color: #34d399;">${aptosCount}</strong>
+                </div>
+                <div style="background: rgba(245, 158, 11, 0.15); padding: 8px 12px; border-radius: 6px; border: 1px solid #f59e0b; text-align: center;">
+                    <small style="color: #fde68a; display: block;">⚠️ Por Vencer (≤90d)</small>
+                    <strong style="font-size: 1.15rem; color: #fbbf24;">${proxCount}</strong>
+                </div>
+                <div style="background: rgba(244, 63, 94, 0.15); padding: 8px 12px; border-radius: 6px; border: 1px solid #f43f5e; text-align: center;">
+                    <small style="color: #fecdd3; display: block;">⛔ No Apto (Vencido)</small>
+                    <strong style="font-size: 1.15rem; color: #fb7185;">${vencCount}</strong>
+                </div>
+            </div>
+
+            ${reportEmpresaHTML}
+
+            <div style="margin-top: 10px;">
+                <strong style="color: #f8fafc; font-size: 0.9rem; display: block; margin-bottom: 8px;">
+                    📨 Correos Individuales Personalizados Enviados a Cada Trabajador (${result.correos_trabajadores_enviados}):
+                </strong>
+                <div style="max-height: 250px; overflow-y: auto; padding-right: 4px;">
+                    ${filasCorreosTrab}
+                </div>
+            </div>
+
+            ${erroresHTML}
+        `;
+
+        loadCertificados();
+        loadDashboardKPIs();
+        loadAlertasLog();
+    } catch (err) {
+        alert('Error en carga masiva Excel: ' + err.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '🚀 Procesar Carga Masiva Excel';
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+        }
+    }
+}
+
+function formatFechaUI(fechaInput) {
+    if (!fechaInput) return 'N/A';
+    const str = String(fechaInput).split('T')[0];
+    const p = str.split('-');
+    if (p.length === 3) return `${p[0]}-${p[1]}-${p[2]}`;
+    return str;
+}
+
+function calcularDiasRestantesUI(fechaVencStr) {
+    if (!fechaVencStr) return null;
+    const cleanStr = String(fechaVencStr).split('T')[0];
+    const venc = new Date(cleanStr);
+    const ahora = new Date();
+    ahora.setHours(0,0,0,0);
+    const diffMs = venc.getTime() - ahora.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+// 4. Load List of Certificates with Full Contact Info (Filtered by Active Company Profile)
+async function loadCertificados() {
+    try {
+        let targetEmpresaId = empresaActivaId;
+        if (esUsuarioEmpresa()) {
+            targetEmpresaId = usuarioSesionActivo.empresa_id;
+        }
+
+        let url = '/api/v1/certificados';
+        if (targetEmpresaId) {
+            url += '?empresa_id=' + targetEmpresaId;
+        }
+
+        const res = await fetch(url);
+        const certs = await res.json();
+
+        const tbody = document.getElementById('tbody-certificados');
+        if (!tbody) return;
+
+        if (certs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No hay certificados registrados aún para la empresa seleccionada. Utilize los métodos de carga de arriba para registrar personal.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = certs.map(c => {
+            const fechaEm = formatFechaUI(c.fecha_emision);
+            const fechaVenc = formatFechaUI(c.fecha_vencimiento);
+            const diasRestantes = calcularDiasRestantesUI(c.fecha_vencimiento);
+
+            let badgeVigencia = '';
+            if (diasRestantes === null) {
+                badgeVigencia = `<span class="badge badge-secondary">S/I</span>`;
+            } else if (diasRestantes <= 0) {
+                badgeVigencia = `<span class="badge badge-danger">⛔ NO APTO (Vencido)</span>`;
+            } else if (diasRestantes <= 90) {
+                badgeVigencia = `<span class="badge badge-warning">⚠️ POR VENCER (${diasRestantes}d - Alerta Enviada)</span>`;
+            } else {
+                badgeVigencia = `<span class="badge badge-success">✓ APTO (${diasRestantes}d restantes)</span>`;
+            }
+
+            const badgeAudit = `<span class="badge ${c.estado_validacion === 'APROBADO' ? 'badge-success' : (c.estado_validacion === 'RECHAZADO' ? 'badge-danger' : 'badge-warning')}">${c.estado_validacion}</span>`;
+
+            return `
+                <tr>
+                    <td><strong>${c.nombre_curso || c.curso || 'Curso de Homologación'}</strong></td>
+                    <td>
+                        <strong>${c.trabajador_nombre}</strong><br>
+                        <small style="color: var(--text-secondary)">Doc: ${c.trabajador_doc}</small><br>
+                        <small style="color: var(--accent-blue)">✉️ ${c.trabajador_email}</small><br>
+                        <small style="color: var(--success)">📞 ${c.trabajador_telefono}</small>
+                    </td>
+                    <td>
+                        <strong>${c.empresa_nombre}</strong><br>
+                        <small style="color: var(--text-secondary)">✉️ ${c.empresa_email}</small><br>
+                        <small style="color: var(--text-secondary)">📞 ${c.empresa_telefono}</small>
+                    </td>
+                    <td><strong style="color: var(--text-primary);">${fechaEm}</strong></td>
+                    <td><strong style="color: var(--accent-blue);">${fechaVenc}</strong></td>
+                    <td><code>${c.codigo_qr_hash || c.qr_hash || 'QR_BATCH_EXCEL'}</code></td>
+                    <td>${badgeAudit}</td>
+                    <td>${badgeVigencia}</td>
+                    <td>
+                        <button class="btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;" onclick="enviarAlertaIndividualJS('${c.id}')">✉️ Enviar Correo</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading certificados:', err);
+    }
+}
+
+async function enviarAlertaIndividualJS(certId) {
+    const emailOverrideInput = document.getElementById('input-test-email-override');
+    const testEmail = emailOverrideInput ? emailOverrideInput.value.trim() : '';
+
+    try {
+        const res = await fetch('/api/v1/alertas/enviar-individual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ certificado_id: certId, email_prueba: testEmail || null })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al enviar alerta individual por correo.');
+
+        mostrarModalPreviewHTML(data);
+        loadAlertasLog();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+function mostrarModalPreviewHTML(data) {
+    document.getElementById('preview-asunto-text').textContent = data.asunto || 'Notificación Preventiva HSE';
+    document.getElementById('preview-destinatario-text').textContent = data.email_destino_final || `${data.email_trabajador}, ${data.email_empresa}`;
+    document.getElementById('preview-html-container').innerHTML = data.cuerpo_html;
+    document.getElementById('modal-preview-correo').style.display = 'flex';
+}
+
+function closePreviewCorreoModal() {
+    document.getElementById('modal-preview-correo').style.display = 'none';
+}
+
+// 5. Supervisor Audit List
+async function loadAuditoriaList() {
+    try {
+        const empFilter = document.getElementById('filter-audit-empresa')?.value || superAdminScopeCompanyId || (esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : null);
+        const estadoFilter = document.getElementById('filter-audit-estado')?.value || null;
+
+        let url = '/api/v1/certificados';
+        if (empFilter) {
+            url += '?empresa_id=' + empFilter;
+        }
+
+        const res = await fetch(url);
+        let certs = await res.json();
+
+        if (estadoFilter) {
+            certs = certs.filter(c => c.estado_validacion === estadoFilter);
+        }
+
+        const tbody = document.getElementById('tbody-auditoria');
+        if (!tbody) return;
+
+        if (certs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No hay certificados que coincidan con los filtros seleccionados.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = certs.map(c => `
+            <tr>
+                <td><strong>${c.nombre_curso || c.curso || 'Curso de Homologación'}</strong></td>
+                <td>
+                    <strong>${c.trabajador_nombre}</strong><br>
+                    <small style="color: var(--accent-cyan); font-weight: 600;">${c.empresa_nombre}</small>
+                </td>
+                <td>${c.entidad_emisora || c.entidad || 'Instituto Certificador'}</td>
+                <td>${formatFechaUI(c.fecha_emision)} &rarr; <strong>${formatFechaUI(c.fecha_vencimiento)}</strong></td>
+                <td><span class="badge ${c.estado_validacion === 'APROBADO' ? 'badge-success' : (c.estado_validacion === 'RECHAZADO' ? 'badge-danger' : 'badge-warning')}">${c.estado_validacion}</span></td>
+                <td class="action-cell">
+                    ${c.estado_validacion === 'EN_VALIDACION' ? `
+                        <button class="btn-action-approve" onclick="evaluarCertificado('${c.id}', 'APROBADO')">✓ Aprobar</button>
+                        <button class="btn-action-reject" onclick="evaluarCertificado('${c.id}', 'RECHAZADO')">✕ Rechazar</button>
+                    ` : '<span style="color: var(--text-secondary); font-size: 0.85rem;">Auditado</span>'}
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading auditoria list:', err);
+    }
+}
+
+async function aprobarTodosCertificadosPendientes() {
+    const empFilter = document.getElementById('filter-audit-empresa')?.value || superAdminScopeCompanyId || (esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : null);
+
+    let url = '/api/v1/certificados';
+    if (empFilter) url += '?empresa_id=' + empFilter;
+
+    const res = await fetch(url);
+    const certs = await res.json();
+    const pendientes = certs.filter(c => c.estado_validacion === 'EN_VALIDACION');
+
+    if (pendientes.length === 0) {
+        return alert('No hay certificados pendientes (EN_VALIDACION) para aprobar en el filtro seleccionado.');
+    }
+
+    if (!confirm(`⚡ ¿Desea aprobar en lote los ${pendientes.length} certificados pendientes de la cuadrilla?`)) return;
+
+    let aprobadosCount = 0;
+    for (let c of pendientes) {
+        try {
+            await fetch('/api/v1/homologaciones/evaluar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ certificado_id: c.id, estado: 'APROBADO', observacion: 'Aprobación masiva de cuadrilla por Supervisor HSE Super Admin.' })
+            });
+            aprobadosCount++;
+        } catch (e) {
+            console.error('Error aprobando certificado', c.id, e);
+        }
+    }
+
+    alert(`✅ ${aprobadosCount} certificados fueron APROBADOS exitosamente en lote.`);
+    loadAuditoriaList();
+    loadCertificados();
+    loadDashboardKPIs();
+}
+
+async function consultarPaseGaritaDNI() {
+    const input = document.getElementById('input-garita-search-dni');
+    const query = input ? input.value.trim().toLowerCase() : '';
+    const resultBox = document.getElementById('garita-result-box');
+
+    if (!query) {
+        return alert('Por favor ingrese un DNI o apellido para consultar el pase de ingreso en garita.');
+    }
+
+    try {
+        const res = await fetch('/api/v1/certificados');
+        const certs = await res.json();
+
+        // Match worker by DNI or name
+        const certsMatch = certs.filter(c => 
+            (c.trabajador_doc && c.trabajador_doc.toLowerCase().includes(query)) ||
+            (c.trabajador_nombre && c.trabajador_nombre.toLowerCase().includes(query))
+        );
+
+        resultBox.style.display = 'block';
+
+        if (certsMatch.length === 0) {
+            resultBox.innerHTML = `
+                <div style="background: rgba(244, 63, 94, 0.15); border: 1px solid var(--danger); padding: 1rem 1.25rem; border-radius: 8px; color: #f8fafc;">
+                    <strong style="color: var(--danger); font-size: 1rem;">⛔ TRABAJADOR NO REGISTRADO EN BASE DE DATOS MINERA</strong><br>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">No existen registros de homologación ni certificados cargados para el documento/nombre: <code>${query}</code>. El acceso en garita queda RESTRINGIDO.</span>
+                </div>
+            `;
+            return;
+        }
+
+        const primerCert = certsMatch[0];
+        const todosAprobados = certsMatch.every(c => c.estado_validacion === 'APROBADO');
+        const algunoVencido = certsMatch.some(c => c.estado_vigencia === 'INHABILITADO' || (calcularDiasRestantesUI(c.fecha_vencimiento) <= 0));
+
+        const esHabilitado = todosAprobados && !algunoVencido;
+
+        const badgeState = esHabilitado
+            ? `<div style="background: #10b981; color: #000; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>✅ PASE AUTORIZADO - ACCESO PERMITIDO A PLANTA MINERA</span>
+                <span style="font-size: 0.8rem; background: rgba(0,0,0,0.2); padding: 0.2rem 0.6rem; border-radius: 4px;">PASE: HABILITADO</span>
+               </div>`
+            : `<div style="background: #f43f5e; color: #fff; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>⛔ ACCESO RESTRINGIDO - INHABILITADO EN GARITA</span>
+                <span style="font-size: 0.8rem; background: rgba(0,0,0,0.2); padding: 0.2rem 0.6rem; border-radius: 4px;">PASE: NO APTO</span>
+               </div>`;
+
+        const cursosHTML = certsMatch.map(c => {
+            const dRest = calcularDiasRestantesUI(c.fecha_vencimiento);
+            const badgeC = c.estado_validacion === 'APROBADO' 
+                ? (dRest > 0 ? `<span class="badge badge-success">✓ Aprobado (${dRest}d restantes)</span>` : `<span class="badge badge-danger">⛔ Vencido</span>`)
+                : `<span class="badge badge-warning">⏳ Auditando (${c.estado_validacion})</span>`;
+
+            return `<div style="background: #1e293b; padding: 0.5rem 0.75rem; border-radius: 6px; margin-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                <span>📜 <strong>${c.nombre_curso}</strong> (${formatFechaUI(c.fecha_vencimiento)})</span>
+                ${badgeC}
+            </div>`;
+        }).join('');
+
+        resultBox.innerHTML = `
+            <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); padding: 1.25rem; border-radius: 10px;">
+                ${badgeState}
+                <div style="display: flex; gap: 1.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Datos del Personal Homologado:</span>
+                        <h3 style="margin: 0.25rem 0; color: #fff;">👤 ${primerCert.trabajador_nombre}</h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">
+                            <strong>DNI / Doc:</strong> ${primerCert.trabajador_doc}<br>
+                            <strong>Empresa Contratista:</strong> <span style="color: var(--accent-blue); font-weight: 700;">${primerCert.empresa_nombre}</span><br>
+                            <strong>Teléfono:</strong> ${primerCert.trabajador_telefono || 'N/A'} | <strong>Email:</strong> ${primerCert.trabajador_email || 'N/A'}
+                        </p>
+                    </div>
+                    <div style="flex: 1; min-width: 280px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Expediente de Certificaciones Mineras (${certsMatch.length}):</span>
+                        ${cursosHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        alert('Error consultando pase de garita: ' + err.message);
+    }
+}
+
+async function evaluarCertificado(certId, nuevoEstado) {
+    const obs = prompt(`Ingrese la observación para ${nuevoEstado}:`, nuevoEstado === 'APROBADO' ? 'Certificado auditado y validado conforme.' : 'Documento ilegible / No cumple requisitos.');
+    if (obs === null) return;
+
+    try {
+        const res = await fetch('/api/v1/homologaciones/evaluar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ certificado_id: certId, estado: nuevoEstado, observacion: obs })
+        });
+        const data = await res.json();
+        alert(data.message);
+        loadAuditoriaList();
+        loadCertificados();
+        loadDashboardKPIs();
+    } catch (err) {
+        alert('Error al evaluar certificado: ' + err.message);
+    }
+}
+
+// 6. Cron Engine & Email Alerts Scanner (Escalado: 90, 30 y 10 Días)
+async function triggerAlertScan(forzar = false) {
+    try {
+        const emailOverrideInput = document.getElementById('input-test-email-override');
+        const testEmail = emailOverrideInput ? emailOverrideInput.value.trim() : '';
+
+        let url = '/api/v1/alertas/ejecutar-escaneo';
+        const params = new URLSearchParams();
+        if (esUsuarioEmpresa()) params.append('empresa_id', usuarioSesionActivo.empresa_id);
+        if (testEmail) params.append('email_prueba', testEmail);
+        if (forzar) params.append('forzar', 'true');
+
+        if (params.toString()) url += '?' + params.toString();
+
+        const res = await fetch(url, { method: 'POST' });
+        const data = await res.json();
+
+        const modoMsg = data.modo_prueba_activo ? `\n(🧪 MODO PRUEBA ACTIVO: Redirigido a ${data.correo_prueba_usado})` : '';
+
+        alert(`🤖 EVALUACIÓN AUTOMÁTICA DE VENCIMIENTOS (90, 30 y 10 DÍAS):\n\n` +
+              `• Certificados Escaneados en BD: ${data.total_certificados_escaneados}\n` +
+              `• En rango de 90 días (Primer aviso): ${data.en_rango_90_dias}\n` +
+              `• En rango de 30 días (Segundo aviso): ${data.en_rango_30_dias}\n` +
+              `• En rango crítico de 10 días (Urgencia): ${data.en_rango_10_dias}\n` +
+              `• Certificados Inhabilitados: ${data.certificados_inhabilitados}\n` +
+              `• Correos de Alertas Emitidos: ${data.correos_alertas_enviados}${modoMsg}\n\n` +
+              `El motor aplicó control anti-spam para no duplicar avisos en la misma etapa.`);
+
+        loadCertificados();
+        loadDashboardKPIs();
+        loadAlertasLog();
+    } catch (err) {
+        alert('Error ejecutando escaneo de alertas: ' + err.message);
+    }
+}
+
+let alertasCache = [];
+
+function verAlertaPreview(id) {
+    const item = alertasCache.find(x => x.id === id);
+    if (!item) return alert('Detalle de alerta no encontrado.');
+    mostrarModalPreviewHTML({
+        asunto: item.asunto || item.tipo_alerta || 'Notificación Oficial de Homologaciones HSE',
+        email_destino_final: item.email_destinatario || item.destinatario_email || 'destinatario@minera.com',
+        cuerpo_html: item.cuerpo_html || `<div style="padding: 20px; color: #fff;">${item.mensaje_resumen || 'Sin cuerpo HTML.'}</div>`
+    });
+}
+
+async function loadAlertasLog() {
+    try {
+        let url = '/api/v1/alertas/historial';
+        if (esUsuarioEmpresa()) {
+            url += '?empresa_id=' + usuarioSesionActivo.empresa_id;
+        }
+
+        const res = await fetch(url);
+        const alertas = await res.json();
+
+        const tbody = document.getElementById('tbody-alertas');
+        if (!tbody) return;
+
+        alertasCache = Array.isArray(alertas) ? alertas : [];
+
+        if (alertasCache.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">No se han emitido alertas por correo aún. Utilice el botón superior para ejecutar el escaneo a 90 días o realice una carga masiva Excel.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = alertasCache.map(a => {
+            let badgeTipo = `<span class="badge badge-warning">⚠️ ALERTA (${a.dias_restantes}d)</span>`;
+            if (a.tipo_alerta === 'REPORTE_CARGA_EXCEL') {
+                badgeTipo = `<span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #0284c7;">📋 REPORTE EMPRESA</span>`;
+            } else if (a.tipo_alerta === 'NOTIFICACION_HABILITADO') {
+                badgeTipo = `<span class="badge badge-success">✓ APTO (AUTORIZADO)</span>`;
+            } else if (a.tipo_alerta === 'NOTIFICACION_POR_VENCER') {
+                badgeTipo = `<span class="badge badge-warning">⚠️ POR VENCER (${a.dias_restantes}d)</span>`;
+            } else if (a.tipo_alerta === 'NOTIFICACION_INHABILITADO') {
+                badgeTipo = `<span class="badge badge-danger">⛔ NO APTO (VENCIDO)</span>`;
+            }
+
+            const nombreDestino = (a.trab_nombres ? `${a.trab_nombres} ${a.trab_apellidos || ''}` : null) || a.emp_nombre || 'Destinatario';
+
+            return `
+                <tr>
+                    <td><code>${a.id}</code></td>
+                    <td><strong>${a.emp_nombre || 'Empresa Contratista'}</strong></td>
+                    <td>
+                        <strong>👤 ${nombreDestino}</strong><br>
+                        <small style="color: var(--accent-blue)">✉️ ${a.email_destinatario || a.destinatario_email}</small>
+                    </td>
+                    <td>${badgeTipo}</td>
+                    <td>${formatFechaUI(a.fecha_envio)}</td>
+                    <td>
+                        <button type="button" class="btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; background: #0284c7; cursor: pointer;" onclick="verAlertaPreview('${a.id}')">👁️ Ver Correo</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading alertas log:', err);
+    }
+}
+
+async function ejecutarCronAlertas(forzar = false) {
+    await triggerAlertScan(forzar);
+}
+
+// 7. Load Power BI Endpoint Preview
+async function loadPowerBIPreview() {
+    try {
+        const res = await fetch('/api/v1/bi/reporte-powerbi');
+        const data = await res.json();
+        document.getElementById('powerbi-json-preview').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    } catch (err) {
+        console.error('Error loading Power BI preview:', err);
+    }
+}
+
+// 8. SMTP Diagnostic & Real Email Gateway
+async function checkSMTPStatus() {
+    try {
+        const res = await fetch('/api/v1/alertas/smtp-status');
+        const data = await res.json();
+        const badge = document.getElementById('badge-smtp-status');
+        const hostElem = document.getElementById('smtp-info-host');
+        const userElem = document.getElementById('smtp-info-user');
+        const trapElem = document.getElementById('smtp-info-trap');
+
+        if (hostElem) hostElem.textContent = `${data.smtp_host}:${data.smtp_port}`;
+        if (userElem) userElem.textContent = data.smtp_user;
+        if (trapElem) {
+            trapElem.textContent = data.test_mode_activo ? `🧪 Trap Activo (${data.test_email})` : '🌐 Salida Real por Destinatario';
+            trapElem.style.color = data.test_mode_activo ? '#fbbf24' : '#34d399';
+        }
+
+        if (badge) {
+            if (data.smtp_configurado) {
+                badge.className = 'badge badge-success';
+                badge.textContent = '🟢 SMTP CONECTADO Y LISTO';
+            } else {
+                badge.className = 'badge badge-warning';
+                badge.textContent = '🟡 SMTP VIRTUAL (Falta Contraseña en .env)';
+            }
+        }
+    } catch (e) {
+        console.error('Error checking SMTP status:', e);
+    }
+}
+
+async function probarEnvioSMTPDirecto() {
+    const destino = prompt('Ingrese el correo destinatario donde desea recibir la prueba inmediata:', usuarioSesionActivo?.email || 'cristianre257@gmail.com');
+    if (!destino) return;
+
+    try {
+        const res = await fetch('/api/v1/alertas/enviar-prueba-smtp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ destino })
+        });
+        const result = await res.json();
+        if (result.enviado_real) {
+            alert(`🎉 ¡CORREO ENVIADO CON ÉXITO!\n\nSe despachó a través del servidor SMTP hacia: ${result.destinatario}.\nID del Mensaje: ${result.messageId}\n\nPor favor revise su bandeja de entrada (y spam por ser prueba).`);
+        } else {
+            alert(`ℹ️ ESTADO DEL ENVÍO:\n\nEl sistema preparó el correo, pero el servidor SMTP respondió:\n${result.error || result.motivo}\n\nSi aún no ha colocado la Contraseña de Aplicación en el archivo .env, los correos quedan simulados y guardados en la BD.`);
+        }
+        checkSMTPStatus();
+    } catch (err) {
+        alert('Error conectando con el servidor: ' + err.message);
+    }
+}
+
+function verInstruccionesSMTP() {
+    alert(
+        `📌 PASOS PARA ACTIVAR SALIDA REAL DE CORREOS CON GMAIL:\n\n` +
+        `1. Abra su cuenta de Google (cristianre257@gmail.com) y vaya a "Seguridad".\n` +
+        `2. Active "Verificación en 2 pasos" si no la tiene.\n` +
+        `3. En el buscador de ajustes de Google escriba: "Contraseñas de aplicaciones" (o App Passwords).\n` +
+        `4. Genere una contraseña y seleccione Nombre: "HomologaControl". Le dará un código de 16 letras.\n` +
+        `5. Abra el archivo .env en la raíz del proyecto y en la línea:\n` +
+        `   SMTP_PASS=aqui_sus_16_letras\n` +
+        `6. ¡Listo! A partir de ese momento, cualquier Excel que suba o cualquier correo enviado llegará a las bandejas reales en segundos.`
+    );
+}
+
+// Hook into initial loads
+const oldIniciarSesionUsuario = iniciarSesionUsuario;
+iniciarSesionUsuario = function(user) {
+    oldIniciarSesionUsuario(user);
+    checkSMTPStatus();
+};
+

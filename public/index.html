@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HomologaControl Minería - Control de Homologaciones & HSE</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <!-- PANTALLA DE LOGIN ENTERPRISE SECTOR MINERO (NIVEL ARQUITECTO UX/UI) -->
+    <div id="login-screen" class="login-wrapper">
+        <div class="login-split-container">
+
+            <!-- LEFT HERO SECTION: ENTERPRISE BRANDING & MINING SAFETY HIGHLIGHTS -->
+            <div class="login-hero-panel">
+                <div class="hero-badge">⛰️ SECTOR MINERO ENTERPRISE | D.S. 024-2016-EM & ISO 45001</div>
+                <div class="hero-logo-row">
+                    <div class="logo-icon-lg">⛏️</div>
+                    <div>
+                        <h2>HomologaControl</h2>
+                        <span class="hero-subtitle">Plataforma de Homologación Minera, HSE & Pases de Garita</span>
+                    </div>
+                </div>
+                <p class="hero-description">
+                    Sistema integral para el control de la homologación de contratistas, habilitación de cuadrillas mineras, auditoría OCR de pases de seguridad y cumplimiento estricto de la normativa de seguridad minera.
+                </p>
+
+                <div class="hero-features-list">
+                    <div class="feature-item">
+                        <div class="feature-icon">⚡</div>
+                        <div>
+                            <strong>Lectura OCR de Certificados Mineros</strong>
+                            <small>Validación instantánea de cursos de Altura, Espacios Confinados, LOTO y Soldadura 6G.</small>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <div>
+                            <strong>Carga Masiva de Cuadrillas por Excel</strong>
+                            <small>Importación batch por RUC contratista con verificación automática por DNI.</small>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🛡️</div>
+                        <div>
+                            <strong>Control de Acceso en Garita (RBAC)</strong>
+                            <small>Gestión de permisos diferenciados para Admin, Supervisor Auditor HSE y Contratistas.</small>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📈</div>
+                        <div>
+                            <strong>Power BI Real-Time Sync</strong>
+                            <small>Conexión directa para comités de seguridad minera y alertas preventivas a 90 días.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hero-footer-status">
+                    <span>🟢 Conectado a Base de Datos MySQL 8.0 / Workbench Local</span>
+                </div>
+            </div>
+
+            <!-- RIGHT FORM SECTION: EXECUTIVE CORPORATE LOGIN -->
+            <div class="login-form-panel">
+                <div class="login-form-header">
+                    <h3>Acceso a la Plataforma</h3>
+                    <p>Ingrese sus credenciales corporativas autorizadas para acceder al sistema.</p>
+                </div>
+
+                <form id="formLogin" onsubmit="handleUserLogin(event)">
+                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                        <label>Correo Electrónico Institucional *</label>
+                        <div class="input-with-icon">
+                            <span class="input-icon">📧</span>
+                            <input type="email" id="login-email" class="form-control" placeholder="usuario@empresa.com" required>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1.75rem;">
+                        <label>Contraseña *</label>
+                        <div class="input-with-icon">
+                            <span class="input-icon">🔒</span>
+                            <input type="password" id="login-password" class="form-control" placeholder="Ingrese su contraseña" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary btn-login-submit">
+                        <span>Iniciar Sesión</span>
+                    </button>
+                </form>
+
+                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: center;">
+                    <small style="color: var(--text-secondary); font-size: 0.78rem;">
+                        🛡️ Acceso restringido y auditado conforme a los estándares de seguridad industrial y normativas mineras vigentes.
+                    </small>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- APLICACIÓN PRINCIPAL (VISIBLE TRAS LOGIN EXITOSO) -->
+    <div id="app-main-content" style="display: none;">
+        <!-- Header Navigation -->
+        <header>
+            <div class="header-container">
+                <div class="header-top-row">
+                    <div class="logo-section">
+                        <div class="logo-icon">⛏️</div>
+                        <div class="logo-text">
+                            <h1>HomologaControl Minería</h1>
+                            <p>⛰️ Control de Homologaciones Mineras, HSE & Pases de Ingreso a Planta</p>
+                        </div>
+                    </div>
+
+                    <!-- User Session & Privileges Badge -->
+                    <div class="user-session-badge" id="user-session-badge">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+                </div>
+
+                <div class="header-nav-row">
+                    <nav class="nav-tabs">
+                        <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📊 Dashboard BI Minero</button>
+                        <button class="tab-btn" id="tab-btn-contratista" onclick="switchTab('contratista')">📤 Carga Certificados (OCR)</button>
+                        <button class="tab-btn" id="tab-btn-supervisor" onclick="switchTab('supervisor')">🔍 Auditoría Supervisor HSE</button>
+                        <button class="tab-btn" id="tab-btn-usuarios" onclick="switchTab('usuarios')">👥 Usuarios & Roles</button>
+                        <button class="tab-btn" id="tab-btn-cron" onclick="switchTab('cron')">⚡ Motor Alertas (90 días)</button>
+                        <button class="tab-btn" id="tab-btn-powerbi" onclick="switchTab('powerbi')">📈 Endpoint Power BI</button>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- BARRA DE ÁMBITO GLOBAL PARA SUPER ADMINISTRADOR -->
+        <div id="superadmin-scope-bar" class="global-scope-bar" style="display: none;">
+            <div class="scope-info">
+                <span style="font-size: 1.1rem;">👑</span> <strong>Torre de Control Super Admin:</strong> <span style="color: var(--text-secondary);">Ámbito de Operación Activo:</span>
+            </div>
+            <div class="scope-controls">
+                <select id="select-global-scope-company" class="form-control" onchange="superAdminChangeGlobalScope(this.value)">
+                    <option value="">🏛️ VISIÓN GLOBAL DE LA MINA (Todas las Empresas Proveedoras)</option>
+                    <!-- Injected dynamically by JS -->
+                </select>
+            </div>
+        </div>
+
+    <!-- Main Content Container -->
+    <main>
+
+        <!-- TAB 1: DASHBOARD BI -->
+        <div id="tab-dashboard" class="tab-content active">
+
+            <!-- WIDGET BUSCADOR DE GARITA EN TIEMPO REAL -->
+            <div class="glass-card" style="margin-bottom: 1.5rem; border: 1px solid var(--accent-blue);">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>🚪 Garita de Control - Verificación de Pase de Ingreso a Planta por DNI / Documento</span>
+                    <span class="badge badge-info">Control en Garita 24/7</span>
+                </div>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                    <input type="text" id="input-garita-search-dni" class="form-control" placeholder="🔍 Ingrese DNI o Apellidos del trabajador..." style="flex: 1; min-width: 260px;" onkeyup="if(event.key==='Enter') consultarPaseGaritaDNI()">
+                    <button class="btn-primary" onclick="consultarPaseGaritaDNI()" style="padding: 0.75rem 1.25rem; font-weight: 700;">🔍 Consultar Habilitación</button>
+                </div>
+                <div id="garita-result-box" style="display: none; margin-top: 1rem;">
+                    <!-- Dynamic gate pass card injected by JS -->
+                </div>
+            </div>
+
+            <!-- KPI Cards Grid -->
+            <div class="grid-kpis">
+                <div class="kpi-card kpi-blue">
+                    <div class="kpi-info">
+                        <h3>Empresas Proveedoras</h3>
+                        <div class="kpi-value" id="kpi-empresas">0</div>
+                        <div class="kpi-subtext">Contratistas Homologadas</div>
+                    </div>
+                    <div class="kpi-icon blue">🏢</div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-info">
+                        <h3>Personal Habilitado</h3>
+                        <div class="kpi-value" id="kpi-habilitados">0</div>
+                        <div class="kpi-subtext">Acceso Autorizado a Planta</div>
+                    </div>
+                    <div class="kpi-icon green">✅</div>
+                </div>
+                <div class="kpi-card kpi-amber">
+                    <div class="kpi-info">
+                        <h3>Próximos a Vencer (&le;90d)</h3>
+                        <div class="kpi-value" id="kpi-proximos">0</div>
+                        <div class="kpi-subtext">Alerta Preventiva HSE</div>
+                    </div>
+                    <div class="kpi-icon amber">⚠️</div>
+                </div>
+                <div class="kpi-card kpi-red">
+                    <div class="kpi-info">
+                        <h3>Personal Inhabilitado</h3>
+                        <div class="kpi-value" id="kpi-inhabilitados">0</div>
+                        <div class="kpi-subtext">Acceso Restringido en Garita</div>
+                    </div>
+                    <div class="kpi-icon red">⛔</div>
+                </div>
+            </div>
+
+            <!-- Resumen por Empresa Contratista -->
+            <div class="glass-card">
+                <div class="card-title">
+                    <span>Estado de Cumplimiento de Habilitación por Empresa Proveedora Minera</span>
+                    <span class="badge badge-info" id="badge-cumplimiento-global">Cumplimiento Global: 0%</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Empresa Contratista</th>
+                                <th>Total Personal</th>
+                                <th>Habilitados</th>
+                                <th>Próximos Vencer (&le;90d)</th>
+                                <th>Inhabilitados</th>
+                                <th>% Cumplimiento HSE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-empresas-kpi">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Visual Charts -->
+            <div class="glass-card">
+                <div class="card-title">Distribución del Estado Operativo de Cuadrillas en Unidad Minera</div>
+                <div style="max-height: 320px; display: flex; justify-content: center;">
+                    <canvas id="chartStatus"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: PORTAL CONTRATISTA CON PERFILES DE EMPRESA Y MÉTODOS DE CARGA -->
+        <div id="tab-contratista" class="tab-content">
+
+            <!-- SECTOR DE PERFILES DE EMPRESAS CONTRATISTAS (SOLO ADMIN O RESUMEN COMPACTO) -->
+            <div class="glass-card" id="company-section-card">
+                <div class="card-title">
+                    <span id="company-section-title">🏢 Perfiles de Empresas Proveedoras / Contratistas Mineras</span>
+                    <div>
+                        <button class="btn-primary" onclick="openCompanyModal()" id="btn-open-company-modal" style="font-size: 0.85rem; padding: 0.55rem 1.1rem; background: linear-gradient(135deg, var(--success), #059669); color: white;">➕ Agregar Empresa Contratista</button>
+                    </div>
+                </div>
+                <p id="company-section-desc" style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+                    Seleccione una empresa contratista para activar su **Perfil de Homologaciones Mineras**. Los cambios de datos y actualización de personal quedan sincronizados en tiempo real en la Base de Datos.
+                </p>
+
+                <!-- Grid de Tarjetas de Empresas (Admin selector) -->
+                <div class="company-grid" id="company-profiles-grid">
+                    <!-- Dynamic rendering by JS -->
+                </div>
+
+                <!-- Banner Compacto de Empresa Activa -->
+                <div class="active-company-banner" id="active-company-banner" style="display: none;">
+                    <div class="banner-company-info">
+                        <div class="company-logo" id="banner-logo">🏢</div>
+                        <div>
+                            <h2 id="banner-razon-social">Constructora & Montajes CMI S.A.C.</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);" id="banner-details">RUC: 20601234567 | Rubro: Montaje Industrial</p>
+                            <small style="color: var(--accent-amber); font-weight: 700;" id="banner-contacts">✉️ contacto@cmiindustrial.com | 📞 +51 987654321</small>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn-warning" id="btn-edit-active-company" onclick="openEditActiveCompanyModal()" style="font-size: 0.8rem; padding: 0.45rem 0.9rem; margin-right: 0.5rem;">✏️ Editar Datos</button>
+                        <span class="badge badge-success" id="banner-worker-count">0 Personal Registrado</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HUB DE CARGA INTELIGENTE EN 2 COLUMNAS (PDF OCR vs EXCEL BATCH) -->
+            <div class="upload-hub-grid">
+
+                <!-- MÉTODO 1: CARGA INDIVIDUAL PDF CON LECTURA INTELIGENTE OCR -->
+                <div class="glass-card upload-card">
+                    <div class="card-title">
+                        <span>📄 Carga Individual PDF (Lectura OCR)</span>
+                        <span class="badge badge-info">100% Automático</span>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
+                        Sube el certificado digital en PDF. El motor OCR extraerá el DNI, curso y entidad emisor de forma automática.
+                    </p>
+
+                    <form id="formUpload" onsubmit="handleCertificateUpload(event)">
+                        <div class="dropzone-box" id="pdf-dropzone" onclick="document.getElementById('input-file-pdf').click()">
+                            <div class="dropzone-icon">📄</div>
+                            <div class="dropzone-text">
+                                <strong>Arrastre su archivo PDF aquí</strong>
+                                <span>o haga clic para examinar sus archivos</span>
+                            </div>
+                            <div class="dropzone-file-name" id="pdf-filename-preview">Ningún archivo seleccionado</div>
+                            <input type="file" id="input-file-pdf" accept=".pdf" style="display: none;" onchange="handleFileSelected('pdf')">
+                        </div>
+
+                        <div style="margin-top: 1rem;">
+                            <button type="submit" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem;">⚡ Escanear PDF y Registrar en BD Minera</button>
+                        </div>
+                    </form>
+
+                    <div id="ocr-console" class="ocr-box" style="display: none; margin-top: 1rem;">
+                        <strong>[RESULTADO LECTURA OCR & VÍNCULO BD]</strong><br>
+                        <div id="ocr-output-text" style="margin-top: 0.5rem; line-height: 1.5; font-size: 0.85rem;">...</div>
+                    </div>
+                </div>
+
+                <!-- MÉTODO 2: CARGA MASIVA EN EXCEL / CSV -->
+                <div class="glass-card upload-card">
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                        <span>📊 Carga Masiva Excel / CSV</span>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="/plantilla_empleados_prueba.xlsx" download="plantilla_empleados_prueba.xlsx" class="btn-primary" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white;">📥 Descargar Excel de Prueba (.xlsx)</a>
+                            <a href="/api/v1/plantilla/descargar-excel" class="btn-warning" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; color: white;">📄 Plantilla (.csv)</a>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
+                        Sube la lista de cuadrillas en Excel (.csv). El sistema procesará en batch todas las filas y actualizará vigencias.
+                    </p>
+
+                    <form id="formExcelUpload" onsubmit="handleExcelUpload(event)">
+                        <div class="dropzone-box dropzone-excel" id="excel-dropzone" onclick="document.getElementById('input-file-excel').click()">
+                            <div class="dropzone-icon">📊</div>
+                            <div class="dropzone-text">
+                                <strong>Arrastre su lista Excel (.csv) aquí</strong>
+                                <span>o haga clic para seleccionar el archivo</span>
+                            </div>
+                            <div class="dropzone-file-name" id="excel-filename-preview">Ningún archivo seleccionado</div>
+                            <input type="file" id="input-file-excel" accept=".csv, .xlsx" style="display: none;" onchange="handleFileSelected('excel')">
+                        </div>
+
+                        <div style="margin-top: 1rem;">
+                            <button type="submit" id="btn-submit-excel" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; background: linear-gradient(135deg, var(--success), #059669); color: white;">🚀 Procesar Carga Masiva Excel</button>
+                        </div>
+                    </form>
+
+                    <div id="excel-console" class="ocr-box" style="display: none; border-color: var(--success); margin-top: 1rem;">
+                        <strong>[PROCESAMIENTO BATCH EXCEL]</strong><br>
+                        <span id="excel-output-text" style="font-size: 0.85rem;">...</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Historial de Certificados Registrados -->
+            <div class="glass-card" style="margin-top: 1.5rem;">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <span>📜 Historial Unificado de Certificados Homologados (PDF + Excel)</span>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                        <button class="btn-primary" onclick="triggerAlertScan()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 700;">📧 Enviar Notificaciones Preventivas (≤90 Días)</button>
+                        <input type="text" id="filter-certificados-input" onkeyup="filterCertificatesTable()" class="form-control" placeholder="🔍 Filtrar trabajador, curso o DNI..." style="max-width: 250px; font-size: 0.85rem; padding: 0.5rem 0.85rem;">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="custom-table" id="table-certificados-main">
+                        <thead>
+                            <tr>
+                                <th>Certificado Minero</th>
+                                <th>Trabajador</th>
+                                <th>Empresa Contratista</th>
+                                <th>Emisión</th>
+                                <th>Vencimiento (1 Año)</th>
+                                <th>Código QR</th>
+                                <th>Estado Auditoría</th>
+                                <th>Estado Habilitación</th>
+                                <th>Acción Correo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-certificados">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: AUDITORÍA Y SUPERVISIÓN -->
+        <div id="tab-supervisor" class="tab-content">
+            <div class="glass-card">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                    <div>
+                        <h2 style="font-size: 1.15rem; color: #fff; margin: 0;">Módulo de Auditoría y Validación HSE</h2>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">Supervisión de Cuadrillas & Habilitación Minera</span>
+                    </div>
+                    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+                        <select id="filter-audit-empresa" class="form-control filter-select" onchange="loadAuditoriaList()">
+                            <option value="">🏢 Todas las Contratistas</option>
+                        </select>
+                        <select id="filter-audit-estado" class="form-control filter-select" onchange="loadAuditoriaList()">
+                            <option value="">📋 Todos los Estados</option>
+                            <option value="EN_VALIDACION" selected>⏳ Pendientes (EN_VALIDACION)</option>
+                            <option value="APROBADO">✅ Aprobados</option>
+                            <option value="RECHAZADO">❌ Rechazados</option>
+                        </select>
+                        <button class="btn-batch-approve" onclick="aprobarTodosCertificadosPendientes()">⚡ Aprobar Cuadrilla en Lote</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="custom-table table-auditoria">
+                        <thead>
+                            <tr>
+                                <th>Certificado Minero</th>
+                                <th>Trabajador & Empresa</th>
+                                <th>Entidad Certificadora</th>
+                                <th>Vigencia (Emisión &rarr; Vencimiento)</th>
+                                <th>Estado Auditoría</th>
+                                <th>Acción de Decisión</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-auditoria">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: GESTIÓN DE USUARIOS Y ROLES (ADMINISTRADOR) -->
+        <div id="tab-usuarios" class="tab-content">
+            <div class="glass-card">
+                <div class="card-title">
+                    <span>👥 Administración de Usuarios y Asignación de Roles (RBAC)</span>
+                    <button class="btn-primary" onclick="openUserModal()" style="font-size: 0.85rem; padding: 0.55rem 1.1rem; background: linear-gradient(135deg, var(--success), #059669); color: white;">➕ Crear Usuario / Asignar Rol</button>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 1.25rem;" id="users-tab-description">
+                    Gestione las cuentas de usuarios y asignación de responsables. Los <strong>Administradores</strong> pueden registrar y delegar usuarios en cualquier empresa contratista. Las <strong>Empresas Contratistas</strong> pueden registrar personal responsable (1 o 2 gestores) para administrar sus propias homologaciones.
+                </p>
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario / Nombre</th>
+                                <th>Correo Electrónico</th>
+                                <th>Rol Asignado</th>
+                                <th>Empresa Vinculada</th>
+                                <th>Cargo</th>
+                                <th>Último Acceso</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-usuarios">
+                            <!-- Injected dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: MOTOR CRON Y ALERTAS (90 DÍAS) -->
+        <div id="tab-cron" class="tab-content">
+            <!-- TARJETA DE ESTADO SMTP Y CANAL DE CORREO -->
+            <div class="glass-card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent-blue);">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>📡 Servidor de Correo Saliente (SMTP Gateway)</span>
+                    <span id="badge-smtp-status" class="badge badge-warning">Verificando conexión...</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1rem; font-size: 0.85rem;">
+                    <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                        <span style="color: var(--text-secondary); display: block;">Servidor SMTP Configurado:</span>
+                        <strong id="smtp-info-host" style="color: #fff; font-size: 0.95rem;">smtp.gmail.com:465</strong>
+                    </div>
+                    <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                        <span style="color: var(--text-secondary); display: block;">Cuenta Emisora (From):</span>
+                        <strong id="smtp-info-user" style="color: #38bdf8; font-size: 0.95rem;">cristianre257@gmail.com</strong>
+                    </div>
+                    <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                        <span style="color: var(--text-secondary); display: block;">Modo Interceptor de Pruebas:</span>
+                        <strong id="smtp-info-trap" style="color: #fbbf24; font-size: 0.95rem;">Activo / Inactivo</strong>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <button class="btn-primary" onclick="probarEnvioSMTPDirecto()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">📧 Probar Envío de Correo Ahora</button>
+                    <button class="btn-warning" onclick="verInstruccionesSMTP()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">ℹ️ Guía para Vincular Gmail / Outlook</button>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <div class="card-title">
+                    <span>Motor Automático de Evaluación de Vigencias en BD (Escala: 90, 30 y 10 días)</span>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="ejecutarCronAlertas(false)" class="btn-warning">⚡ Ejecutar Cron Escalonado (Normal)</button>
+                        <button onclick="ejecutarCronAlertas(true)" class="btn-primary" style="background: #0284c7;">🔄 Forzar Re-envío (Prueba)</button>
+                    </div>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
+                    <strong>Regla de negocio HSE para certificados en Base de Datos:</strong> El sistema evalúa diariamente las fechas de vigencia y emite notificaciones automatizadas escalonadas:<br>
+                    &bull; <strong style="color: #fbbf24;">Aviso Preventivo a 90 días:</strong> Coordinación de recertificación anual.<br>
+                    &bull; <strong style="color: #f97316;">Segundo Aviso a 30 días:</strong> Último mes para emitir certificado antes del corte.<br>
+                    &bull; <strong style="color: #ef4444;">Alerta Crítica a 10 días:</strong> Riesgo inminente de inhabilitación en garita.<br>
+                    &bull; <strong style="color: #64748b;">Control Anti-Spam:</strong> Cada etapa se dispara una sola vez por certificado para evitar saturar las casillas.
+                </p>
+
+                <div class="card-title" style="font-size: 1rem;">Log de Alertas Emitidas por Email</div>
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>ID Alerta</th>
+                                <th>Empresa Contratista</th>
+                                <th>Destinatario Email</th>
+                                <th>Tipo de Alerta</th>
+                                <th>Fecha Programada</th>
+                                <th>Estado Envíos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-alertas">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 6: POWER BI INTEGRATION -->
+        <div id="tab-powerbi" class="tab-content">
+            <div class="glass-card">
+                <div class="card-title">Integración REST JSON de Datos para Power BI Desktop / Service</div>
+                <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+                    El endpoint REST expone toda la estructura normalizada en formato tabular JSON listo para ser consumido mediante <code>Obtener Datos -> Web</code> en Power BI.
+                </p>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>URL Endpoint OData/REST para Power BI:</label>
+                    <input type="text" id="powerbi-url" class="form-control" value="http://localhost:4400/api/v1/bi/reporte-powerbi" readonly>
+                </div>
+                <div class="ocr-box" id="powerbi-json-preview">
+                    <!-- JSON Preview -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+    </div> <!-- END #app-main-content -->
+
+    <!-- MODAL CREAR / EDITAR EMPRESA CONTRATISTA -->
+    <div id="modal-empresa" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-empresa-title">➕ Registrar Nueva Empresa Contratista</h3>
+                <button onclick="closeCompanyModal()" class="btn-close-modal">✕</button>
+            </div>
+            <form id="formEmpresaModal" onsubmit="handleSaveCompany(event)">
+                <input type="hidden" id="modal-empresa-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Número RUC / RUT *</label>
+                        <input type="text" id="modal-ruc" class="form-control" placeholder="Ej. 20708889911" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Razón Social Oficial *</label>
+                        <input type="text" id="modal-razon" class="form-control" placeholder="Ej. Servicios & Seguridad ALFA S.A.C." required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Comercial</label>
+                        <input type="text" id="modal-comercial" class="form-control" placeholder="Ej. ALFA Seguridad HSE">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Ícono / Logo de la Empresa (Emoji o Texto) *</label>
+                        <input type="text" id="modal-logo" class="form-control" placeholder="Seleccione un logo o escriba un ícono (ej. 🏗️, 🏢)" required>
+                        <div class="logo-presets-container" style="margin-top: 0.5rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); width: 100%; font-weight: 600;">⚡ Logos Sugeridos Minero/Industrial:</span>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🏢')">🏢</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🏗️')">🏗️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🏭')">🏭</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('⚡')">⚡</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('⛏️')">⛏️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🛠️')">🛠️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🚛')">🚛</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🛰️')">🛰️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🛡️')">🛡️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🔧')">🔧</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('⚙️')">⚙️</button>
+                            <button type="button" class="logo-preset-btn" onclick="selectPresetLogo('🌐')">🌐</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Oficial de Contacto *</label>
+                        <input type="email" id="modal-email" class="form-control" placeholder="contacto@empresa.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono Oficial de Contacto</label>
+                        <input type="text" id="modal-telefono" class="form-control" placeholder="+51 987654321">
+                    </div>
+                    <div class="form-group">
+                        <label>Persona de Contacto / Gestor</label>
+                        <input type="text" id="modal-persona" class="form-control" placeholder="Ing. Fernando Silva (Jefe HSE)">
+                    </div>
+                    <div class="form-group">
+                        <label>Rubro / Especialidad</label>
+                        <input type="text" id="modal-rubro" class="form-control" placeholder="Seguridad & Prevención Ocupacional">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Dirección Fiscal</label>
+                        <input type="text" id="modal-direccion" class="form-control" placeholder="Av. Principal 123, Lima">
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button type="button" class="btn-primary" onclick="closeCompanyModal()" style="background: rgba(255,255,255,0.1); color: var(--text-primary); box-shadow: none;">Cancelar</button>
+                    <button type="submit" class="btn-primary">💾 Guardar en BD Persistente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CREAR / EDITAR USUARIO Y ASIGNAR ROL -->
+    <div id="modal-usuario" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-usuario-title">➕ Registrar Nuevo Usuario y Asignar Rol</h3>
+                <button onclick="closeUserModal()" class="btn-close-modal">✕</button>
+            </div>
+            <form id="formUsuarioModal" onsubmit="handleSaveUser(event)">
+                <input type="hidden" id="modal-usuario-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Nombre Completo *</label>
+                        <input type="text" id="modal-user-nombre" class="form-control" placeholder="Ej: Ing. Pedro Ramírez" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Correo Electrónico Oficial *</label>
+                        <input type="email" id="modal-user-email" class="form-control" placeholder="ej: pedro.ramirez@empresa.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña de Acceso *</label>
+                        <input type="password" id="modal-user-password" class="form-control" placeholder="••••••••" value="demo123">
+                    </div>
+                    <div class="form-group">
+                        <label>Rol Corporativo (Privilegios) *</label>
+                        <select id="modal-user-rol" class="form-control" required style="font-weight: 700;">
+                            <option value="ADMINISTRADOR">👑 ADMINISTRADOR GENERAL (Acceso Total Global)</option>
+                            <option value="SUPERVISOR">🔍 SUPERVISOR AUDITOR HSE (Auditoría & Aprobación)</option>
+                            <option value="CONTRATISTA">🏗️ GESTOR DE EMPRESA (Admin de Empresa - Gestiona Usuarios)</option>
+                            <option value="OPERADOR" selected>📄 OPERADOR DE CARGA (Solo Subir Certificados - Sin Acceso a Usuarios)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Empresa Contratista Asignada</label>
+                        <select id="modal-user-empresa" class="form-control">
+                            <!-- Populated dynamically by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cargo / Puesto</label>
+                        <input type="text" id="modal-user-cargo" class="form-control" placeholder="Ej: Gestor HSE / Especialista">
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button type="button" class="btn-primary" onclick="closeUserModal()" style="background: rgba(255,255,255,0.1); color: var(--text-primary); box-shadow: none;">Cancelar</button>
+                    <button type="submit" class="btn-primary">💾 Guardar Usuario y Rol en BD</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CAMBIO OBLIGATORIO DE CONTRASEÑA -->
+    <div id="modal-cambio-password" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 500px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--accent-amber); padding-bottom: 0.75rem;">
+                <h3>🔐 Cambio Obligatorio de Contraseña</h3>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 1rem 0; line-height: 1.5;">
+                Por políticas de seguridad corporativa en producción, al ser su <strong>primer ingreso o haber recibido una contraseña temporal</strong>, debe establecer su nueva contraseña privada antes de continuar.
+            </p>
+            <form id="formCambiarPassword" onsubmit="handleObligatoryPasswordChange(event)">
+                <input type="hidden" id="change-pass-user-id">
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label>Nueva Contraseña Privada (mínimo 6 caracteres) *</label>
+                    <input type="password" id="modal-pass-nuevo" class="form-control" placeholder="••••••••" required minlength="6">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label>Confirmar Nueva Contraseña *</label>
+                    <input type="password" id="modal-pass-confirm" class="form-control" placeholder="••••••••" required minlength="6">
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button type="submit" class="btn-primary" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, var(--success), #059669); color: white;">💾 Guardar Nueva Contraseña e Iniciar Sesión</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL PREVISUALIZACIÓN Y CONFIRMACIÓN DE ENVIOS DE CORREO -->
+    <div id="modal-preview-correo" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 720px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--accent-blue); padding-bottom: 0.75rem;">
+                <h3 id="preview-correo-title">📧 Notificación de Correo Registrada & Enviada</h3>
+                <button onclick="closePreviewCorreoModal()" class="btn-close-modal">✕</button>
+            </div>
+            <div style="padding: 1rem 0;">
+                <div style="background: rgba(15, 23, 42, 0.8); padding: 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="margin-bottom: 0.4rem;"><strong>📌 Asunto:</strong> <span id="preview-asunto-text" style="color: var(--accent-amber); font-weight: 700;">-</span></div>
+                    <div style="margin-bottom: 0.4rem;"><strong>📩 Destinatarios:</strong> <code id="preview-destinatario-text" style="color: var(--accent-blue);">-</code></div>
+                    <div><strong>⚡ Estado en BD:</strong> <span class="badge badge-success">✓ CORREO REGISTRADO EN HISTORIAL</span></div>
+                </div>
+
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 700;">Previsualización del Diseño HTML del Correo:</div>
+                <div id="preview-html-container" style="background: #000; border-radius: 8px; padding: 1rem; overflow-x: auto;">
+                    <!-- Rendered HTML email preview -->
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+                <button type="button" class="btn-primary" onclick="closePreviewCorreoModal()">✓ Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
