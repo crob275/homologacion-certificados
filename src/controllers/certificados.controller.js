@@ -414,35 +414,48 @@ async function cargarMasivaExcel(req, res) {
             mapaEmpresas[eId].items.push(item);
         }
 
-        // 1. Enviar Reporte a cada Empresa Contratista
-        for (let eId of Object.keys(mapaEmpresas)) {
+        // 1. Enviar Reporte a cada Empresa Contratista en paralelo
+        const promesasReportes = Object.keys(mapaEmpresas).map(async (eId) => {
             const { empresa, items } = mapaEmpresas[eId];
             try {
-                const repResult = await enviarReporteCargaEmpresa({
+                return await enviarReporteCargaEmpresa({
                     empresa,
                     remitente,
                     itemsProcesados: items
                 });
-                reportesEmpresaEnviados.push(repResult);
             } catch (errReporte) {
                 console.error(`Error enviando reporte a empresa ${empresa.razon_social}:`, errReporte);
+                return null;
             }
-        }
+        });
 
-        // 2. Enviar correo individual a cada trabajador
-        for (let item of itemsProcesados) {
+        // 2. Enviar correos individuales a cada trabajador en paralelo
+        const promesasTrabajadores = itemsProcesados.map(async (item) => {
             try {
-                const notif = await enviarNotificacionIndividualTrabajador({
+                return await enviarNotificacionIndividualTrabajador({
                     trabajador: item.trabajador,
                     certificado: item.certificado,
                     empresa: item.empresa,
                     remitente,
                     diasRestantes: item.dias_restantes
                 });
-                enviosRealizados.push(notif);
             } catch (errTrab) {
                 console.error(`Error enviando correo individual a trabajador ${item.trabajador.numero_documento}:`, errTrab);
+                return null;
             }
+        });
+
+        // Ejecución concurrente de alto rendimiento
+        const [resultadosReportes, resultadosTrabajadores] = await Promise.all([
+            Promise.all(promesasReportes),
+            Promise.all(promesasTrabajadores)
+        ]);
+
+        for (let r of resultadosReportes) {
+            if (r) reportesEmpresaEnviados.push(r);
+        }
+        for (let t of resultadosTrabajadores) {
+            if (t) enviosRealizados.push(t);
         }
 
         const totalAptos = itemsProcesados.filter(i => i.dias_restantes > 90).length;

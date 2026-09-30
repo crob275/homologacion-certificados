@@ -5,7 +5,9 @@ const { allDB, getDB, runDB, recalcularEstadoTrabajadorBD } = require('../config
 // Solo activar la redirección de prueba si SMTP_TEST_MODE está explícitamente en 'true'
 let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.env.SMTP_TEST_EMAIL) ? process.env.SMTP_TEST_EMAIL : null;
 
-// Transporter SMTP centralizado
+// Transporter SMTP centralizado con Pool persistente (Optimización de alta velocidad)
+let cachedTransporter = null;
+
 function crearTransporterSMTP() {
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = parseInt(process.env.SMTP_PORT || '465');
@@ -17,18 +19,28 @@ function crearTransporterSMTP() {
         return null; // Aún no tiene contraseña configurada, opera en modo virtual/simulación
     }
 
-    return nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: {
-            user,
-            pass
-        },
-        tls: {
-            rejectUnauthorized: false
-        }
-    });
+    if (!cachedTransporter) {
+        cachedTransporter = nodemailer.createTransport({
+            pool: true, // Mantener túnel abierto para envíos instantáneos
+            maxConnections: 5,
+            maxMessages: 100,
+            host,
+            port,
+            secure,
+            auth: {
+                user,
+                pass
+            },
+            tls: {
+                rejectUnauthorized: false
+            },
+            connectionTimeout: 8000,
+            greetingTimeout: 8000,
+            socketTimeout: 10000
+        });
+    }
+
+    return cachedTransporter;
 }
 
 // Despachador de correos hacia Internet o Log Seguro
