@@ -1,4 +1,6 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // Forzar IPv4 para evitar ENETUNREACH en contenedores cloud (Gmail SMTP)
 const app = require('./src/app');
 const { initMySQLConnection } = require('./src/config/database');
 const { ejecutarEscaneoAlertasEscalonadas } = require('./src/services/email.service');

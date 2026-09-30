@@ -1,4 +1,6 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
 const nodemailer = require('nodemailer');
 const { allDB, getDB, runDB, recalcularEstadoTrabajadorBD } = require('../config/database');
 
