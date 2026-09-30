@@ -1,3 +1,4 @@
+require('dotenv').config();
 const nodemailer = require('nodemailer');
 const { allDB, getDB, runDB, recalcularEstadoTrabajadorBD } = require('../config/database');
 
