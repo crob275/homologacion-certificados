@@ -118,7 +118,149 @@ async function initMySQLConnection() {
     }
 
     console.log(`⚠️ No se pudo conectar a MySQL. Usando BD SQLite como respaldo.`);
+    await setupSQLiteSchemaAndSeeds();
     return false;
+}
+
+// Inicialización de Tablas y Semillas en SQLite (Fallback automático para la nube)
+async function setupSQLiteSchemaAndSeeds() {
+    return new Promise((resolve) => {
+        sqliteDb.serialize(() => {
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS empresas (
+                    id TEXT PRIMARY KEY,
+                    ruc_rut TEXT UNIQUE,
+                    razon_social TEXT,
+                    nombre_comercial TEXT,
+                    logo_icon TEXT DEFAULT '🏢',
+                    color_accent TEXT DEFAULT '#38bdf8',
+                    email_contacto TEXT,
+                    telefono_contacto TEXT,
+                    contacto_persona TEXT,
+                    rubro TEXT,
+                    direccion TEXT,
+                    estado TEXT DEFAULT 'ACTIVO',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id TEXT PRIMARY KEY,
+                    empresa_id TEXT,
+                    email TEXT UNIQUE,
+                    password_hash TEXT,
+                    nombre_completo TEXT,
+                    cargo TEXT,
+                    rol TEXT DEFAULT 'CONTRATISTA',
+                    telefono TEXT,
+                    activo INTEGER DEFAULT 1,
+                    debe_cambiar_password INTEGER DEFAULT 0,
+                    ultimo_login DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS trabajadores (
+                    id TEXT PRIMARY KEY,
+                    empresa_id TEXT,
+                    tipo_documento TEXT DEFAULT 'DNI',
+                    numero_documento TEXT UNIQUE,
+                    nombres TEXT,
+                    apellidos TEXT,
+                    email_personal TEXT,
+                    telefono_personal TEXT,
+                    cargo_puesto TEXT,
+                    area_trabajo TEXT,
+                    estado_habilitacion TEXT DEFAULT 'INHABILITADO',
+                    motivo_inhabilitacion TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS certificados (
+                    id TEXT PRIMARY KEY,
+                    trabajador_id TEXT,
+                    empresa_id TEXT,
+                    tipo_certificado_id TEXT,
+                    nombre_curso TEXT,
+                    entidad_emisora TEXT,
+                    horas_lectivas INTEGER DEFAULT 16,
+                    fecha_emision DATE,
+                    fecha_vencimiento DATE,
+                    codigo_qr_hash TEXT,
+                    pdf_filename TEXT,
+                    url_pdf_storage TEXT,
+                    estado_validacion TEXT DEFAULT 'EN_VALIDACION',
+                    estado_vigencia TEXT DEFAULT 'HABILITADO',
+                    alerta_90d_enviada INTEGER DEFAULT 0,
+                    alerta_30d_enviada INTEGER DEFAULT 0,
+                    alerta_10d_enviada INTEGER DEFAULT 0,
+                    fecha_ultima_alerta DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS alertas_notificaciones (
+                    id TEXT PRIMARY KEY,
+                    certificado_id TEXT,
+                    trabajador_id TEXT,
+                    empresa_id TEXT,
+                    email_destinatario TEXT,
+                    destinatario_email TEXT,
+                    asunto TEXT,
+                    tipo_alerta TEXT DEFAULT 'ALERTA_90_DIAS',
+                    dias_restantes INTEGER,
+                    mensaje_resumen TEXT,
+                    cuerpo_html TEXT,
+                    estado TEXT DEFAULT 'ENVIADO',
+                    fecha_envio DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Insertar empresas por defecto
+            sqliteDb.get('SELECT COUNT(*) as count FROM empresas', (err, row) => {
+                if (row && row.count === 0) {
+                    sqliteDb.run(`
+                        INSERT INTO empresas (id, ruc_rut, razon_social, nombre_comercial, logo_icon, color_accent, email_contacto, telefono_contacto, contacto_persona, rubro, direccion) VALUES
+                        ('emp-1', '20601234567', 'Constructora & Montajes CMI S.A.C.', 'CMI Industrial', '🏗️', '#38bdf8', 'contacto@cmiindustrial.com', '+51 987654321', 'Ing. Roberto Torres (Gerente)', 'Montaje Industrial & Estructuras', 'Av. Industrial 450, Lima'),
+                        ('emp-2', '20509876543', 'Servicios Eléctricos SELECA E.I.R.L.', 'SELECA Electricidad', '⚡', '#f59e0b', 'operaciones@seleca.com', '+51 912345678', 'Lic. Elena Gómez (RRHH)', 'Mantenimiento & Alta Tensión', 'Calle Los Metalúrgicos 120, Arequipa'),
+                        ('emp-3', '20405554433', 'Ingeniería y Mantenimiento INGEMANT S.A.', 'INGEMANT Mantenimiento', '🛠️', '#10b981', 'admin@ingemant.pe', '+51 955443322', 'Ing. Carlos Mendoza (Jefe Planta)', 'Mantenimiento Mecánico de Planta', 'Av. Argentina 1020, Callao'),
+                        ('emp-4', '20708889911', 'Servicios & Seguridad Industrial ALFA S.A.C.', 'ALFA Seguridad HSE', '🛡️', '#a855f7', 'contacto@seguridadalfa.pe', '+51 977112233', 'Ing. Fernando Silva (Jefe HSE)', 'Seguridad Ocupacional & Prevención', 'Av. Javier Prado Este 2100, Lima')
+                    `);
+                }
+            });
+
+            // Insertar usuarios por defecto
+            sqliteDb.get('SELECT COUNT(*) as count FROM usuarios', (err, row) => {
+                if (row && row.count === 0) {
+                    sqliteDb.run(`
+                        INSERT INTO usuarios (id, empresa_id, email, password_hash, nombre_completo, cargo, rol, debe_cambiar_password) VALUES
+                        ('u-christian', 'emp-3', 'cristianre257@gmail.com', 'Admin2026!', 'Christian Renato Ortega Bernedo', 'Gestor INGEMANT', 'CONTRATISTA', 0),
+                        ('u-admin', NULL, 'admin@homologacontrol.com', 'Admin2026!', 'Carlos Mendoza (Admin General)', 'Administrador del Sistema', 'ADMINISTRADOR', 0),
+                        ('u-supervisor', NULL, 'supervisor.hse@homologacontrol.com', 'SuperHSE2026!', 'Ing. Sofia Ramírez (Supervisor HSE)', 'Auditor HSE Principal', 'SUPERVISOR', 0),
+                        ('u-contratista-1', 'emp-1', 'contacto@cmiindustrial.com', 'CMI2026!Pass', 'Ing. Roberto Torres', 'Gestor CMI Industrial', 'CONTRATISTA', 0),
+                        ('u-operador-1', 'emp-1', 'operador.cmi@cmiindustrial.com', 'Operador2026!', 'Luis Luque (Operador)', 'Operador de Carga CMI', 'OPERADOR', 0),
+                        ('u-contratista-2', 'emp-2', 'operaciones@seleca.com', 'SELECA2026!Pass', 'Lic. Elena Gómez', 'Gestor SELECA', 'CONTRATISTA', 0),
+                        ('u-operador-2', 'emp-2', 'operador.seleca@seleca.com', 'Operador2026!', 'Mateo Fernández', 'Operador de Carga SELECA', 'OPERADOR', 0),
+                        ('u-contratista-3', 'emp-3', 'admin@ingemant.pe', 'INGEMANT2026!Pass', 'Ing. Carlos Mendoza', 'Gestor INGEMANT', 'CONTRATISTA', 0),
+                        ('u-operador-3', 'emp-3', 'operador.ingemant@ingemant.pe', 'Operador2026!', 'Jorge Huanca', 'Operador de Carga INGEMANT', 'OPERADOR', 0),
+                        ('u-contratista-4', 'emp-4', 'contacto@seguridadalfa.pe', 'ALFA2026!Pass', 'Ing. Fernando Silva', 'Gestor ALFA', 'CONTRATISTA', 0),
+                        ('u-operador-4', 'emp-4', 'operador.alfa@seguridadalfa.pe', 'Operador2026!', 'Sergio Juárez', 'Operador de Carga ALFA', 'OPERADOR', 0)
+                    `, () => resolve());
+                } else {
+                    resolve();
+                }
+            });
+        });
+    });
 }
 
 // Inicialización de Tablas y Semillas en MySQL 8.0
@@ -325,11 +467,12 @@ async function setupMySQLSchemaAndSeeds() {
 
         const [usrRows] = await mysqlPool.query('SELECT COUNT(*) AS count FROM usuarios');
         if (usrRows[0].count === 0) {
-            console.log('🌱 Poblando Usuarios y Contraseñas en MySQL Workbench...');
+            console.log('🌱 Poblando Usuarios y Contraseñas en MySQL Workbench / Cloud...');
             await mysqlPool.query(`
                 INSERT INTO usuarios (id, empresa_id, email, password_hash, nombre_completo, cargo, rol, debe_cambiar_password) VALUES
+                ('u-christian', 'emp-3', 'cristianre257@gmail.com', 'Admin2026!', 'Christian Renato Ortega Bernedo', 'Gestor INGEMANT', 'CONTRATISTA', 0),
                 ('u-admin', NULL, 'admin@homologacontrol.com', 'Admin2026!', 'Carlos Mendoza (Admin General)', 'Administrador del Sistema', 'ADMINISTRADOR', 0),
-                ('u-supervisor', NULL, 'supervisor.hse@homologacontrol.com', 'SuperHSE2026!', 'Ing. Sofia Ramírez (Supervisor HSE)', 'Auditor HSE Principal', 'SUPERVISOR', 1),
+                ('u-supervisor', NULL, 'supervisor.hse@homologacontrol.com', 'SuperHSE2026!', 'Ing. Sofia Ramírez (Supervisor HSE)', 'Auditor HSE Principal', 'SUPERVISOR', 0),
                 ('u-contratista-1', 'emp-1', 'contacto@cmiindustrial.com', 'CMI2026!Pass', 'Ing. Roberto Torres', 'Gestor CMI Industrial', 'CONTRATISTA', 0),
                 ('u-operador-1', 'emp-1', 'operador.cmi@cmiindustrial.com', 'Operador2026!', 'Luis Luque (Operador)', 'Operador de Carga CMI', 'OPERADOR', 0),
                 ('u-contratista-2', 'emp-2', 'operaciones@seleca.com', 'SELECA2026!Pass', 'Lic. Elena Gómez', 'Gestor SELECA', 'CONTRATISTA', 0),
