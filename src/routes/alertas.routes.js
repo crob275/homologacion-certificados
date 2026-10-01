@@ -35,6 +35,34 @@ router.get(['/smtp-status', '/smtp_status'], async (req, res) => {
     });
 });
 
+// Prueba directa de envío SMTP (Soporta GET y POST)
+router.all('/enviar-prueba-smtp', async (req, res) => {
+    try {
+        const destino = req.query.destino || req.body?.destino || process.env.SMTP_USER || 'cristianre257@gmail.com';
+        console.log(`🧪 [ENDPOINT PRUEBA SMTP DISPARADO]: Destino solicitado -> ${destino}`);
+        const { despacharCorreoInternet } = require('../services/email.service');
+        
+        const resultado = await despacharCorreoInternet({
+            to: destino,
+            subject: '🔔 [PRUEBA CONECTIVIDAD] Notificaciones HomologaControl Activas',
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; border-radius: 8px;">
+                    <h2 style="color: #38bdf8;">Conexión SMTP Establecida con Éxito</h2>
+                    <p>Este es un correo de prueba enviado desde la plataforma <strong>HomologaControl</strong> en Railway.</p>
+                    <p>Servidor: <code>${process.env.SMTP_HOST || 'smtp.gmail.com'}</code></p>
+                    <p>Fecha y Hora: <strong>${new Date().toLocaleString()}</strong></p>
+                </div>
+            `
+        });
+
+        console.log('🧪 [RESULTADO PRUEBA SMTP]:', resultado);
+        res.json(resultado);
+    } catch (err) {
+        console.error('❌ [ERROR EN ENDPOINT PRUEBA SMTP]:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Obtener detalle de una alerta individual por ID (incluyendo cuerpo HTML completo)
 router.get('/:id', async (req, res) => {
     try {
@@ -86,32 +114,6 @@ router.post('/configurar-correo-prueba', (req, res) => {
 
 router.get('/configurar-correo-prueba', (req, res) => {
     res.json({ correo_prueba_activo: getCorreoPruebaRedireccion() });
-});
-
-
-router.post('/enviar-prueba-smtp', async (req, res) => {
-    try {
-        const { destino } = req.body;
-        const target = destino || process.env.SMTP_USER || 'cristianre257@gmail.com';
-        const { despacharCorreoInternet } = require('../services/email.service');
-        
-        const resultado = await despacharCorreoInternet({
-            to: target,
-            subject: '🔔 [PRUEBA CONECTIVIDAD] Notificaciones HomologaControl Activas',
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; border-radius: 8px;">
-                    <h2 style="color: #38bdf8;">Conexión SMTP Establecida con Éxito</h2>
-                    <p>Este es un correo de prueba enviado desde la plataforma <strong>HomologaControl</strong>.</p>
-                    <p>Servidor: <code>${process.env.SMTP_HOST || 'smtp.gmail.com'}</code></p>
-                    <p>Fecha y Hora: <strong>${new Date().toLocaleString()}</strong></p>
-                </div>
-            `
-        });
-
-        res.json(resultado);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
 });
 
 module.exports = router;
