@@ -81,7 +81,9 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
             destinatario: destinatarioEfectivo
         };
     } catch (smtpErr) {
-        console.error(`⚠️ [ERROR SMTP AL ENVIAR]:`, smtpErr.message);
+        console.error(`⚠️ [ERROR SMTP AL ENVIAR a ${destinatarioEfectivo}]:`, smtpErr.message);
+        // Si la conexión cayó, liberar el cachedTransporter para que reintente limpio en el siguiente
+        cachedTransporter = null;
         return {
             enviado_real: false,
             error: smtpErr.message,
@@ -221,7 +223,7 @@ async function enviarAlertaVencimiento({ trabajador, certificado, empresa, diasR
     const esModoPrueba = Boolean(testTarget);
 
     const emailDestinoFinal = esModoPrueba 
-        ? `${testTarget} (Prueba Redirigida de: ${emailTrabajador}, ${emailEmpresa})`
+        ? testTarget
         : `${emailTrabajador}, ${emailEmpresa}`;
 
     const fechaFormateada = formatFechaLimpia(certificado.fecha_vencimiento);
