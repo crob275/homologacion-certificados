@@ -29,6 +29,7 @@ function crearTransporterSMTP() {
             host,
             port,
             secure,
+            family: 4, // FORZAR IPV4 ESTRICTO EN EL SOCKET (Evita error ENETUNREACH con IPv6 en Railway)
             auth: {
                 user,
                 pass
