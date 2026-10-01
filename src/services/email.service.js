@@ -31,8 +31,6 @@ async function resolverHostIPv4(nombreHost) {
 
 async function crearTransporterSMTP(customPort = null, customSecure = null) {
     const rawHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const port = customPort || parseInt(process.env.SMTP_PORT || '465');
-    const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
     const user = process.env.SMTP_USER || '';
     const pass = process.env.SMTP_PASS || '';
 
@@ -40,7 +38,23 @@ async function crearTransporterSMTP(customPort = null, customSecure = null) {
         return null; // Aún no tiene contraseña configurada, opera en modo virtual/simulación
     }
 
-    // Resolver a IPv4 para evitar que los contenedores Linux de Railway intenten IPv6 con ENETUNREACH
+    // Para Gmail, usar directamente el servicio preconfigurado de nodemailer
+    // Esto utiliza internamente las conexiones optimizadas y compatibles con Docker/Cloud
+    if (rawHost.includes('gmail')) {
+        return nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user,
+                pass
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+    }
+
+    const port = customPort || parseInt(process.env.SMTP_PORT || '465');
+    const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
     const ipv4Target = await resolverHostIPv4(rawHost);
 
     return nodemailer.createTransport({
@@ -54,7 +68,7 @@ async function crearTransporterSMTP(customPort = null, customSecure = null) {
         },
         tls: {
             rejectUnauthorized: false,
-            servername: rawHost // Vital para que el certificado SSL valide smtp.gmail.com
+            servername: rawHost
         },
         connectionTimeout: 10000,
         greetingTimeout: 10000,
