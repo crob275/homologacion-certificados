@@ -27,8 +27,19 @@ function crearTransporterSMTP(customPort = null, customSecure = null) {
         secure,
         family: 4,
         lookup: (hostname, options, callback) => {
-            dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-                callback(err, address, family);
+            if (typeof options === 'function') {
+                callback = options;
+                options = {};
+            }
+            dns.resolve4(hostname, (err, addresses) => {
+                if (err || !addresses || addresses.length === 0) {
+                    return dns.lookup(hostname, { family: 4 }, callback);
+                }
+                if (options && options.all) {
+                    callback(null, addresses.map(a => ({ address: a, family: 4 })));
+                } else {
+                    callback(null, addresses[0], 4);
+                }
             });
         },
         auth: {
