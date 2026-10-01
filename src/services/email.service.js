@@ -1,8 +1,38 @@
 require('dotenv').config();
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
+const path = require('path');
 const nodemailer = require('nodemailer');
 const { allDB, getDB, runDB, recalcularEstadoTrabajadorBD } = require('../config/database');
+
+// =========================================================================
+// PARCHE DE ULTRA-CONECTIVIDAD CLOUD: PURA RESOLUCIÓN IPv4 EN NODEMAILER
+// En entornos contenedores (Docker/Railway/Kubernetes), nodemailer intenta
+// conectar por IPv6 arrojando 'ENETUNREACH'. Este hook filtra y garantiza
+// que todas las direcciones sean pura IPv4 con su hostname SNI válido.
+// =========================================================================
+try {
+    const sharedPath = path.join(path.dirname(require.resolve('nodemailer')), 'shared', 'index.js');
+    const nodemailerShared = require(sharedPath);
+    if (nodemailerShared && typeof nodemailerShared.resolveHostname === 'function') {
+        const originalResolveHostname = nodemailerShared.resolveHostname;
+        nodemailerShared.resolveHostname = function(options, callback) {
+            originalResolveHostname(options, (err, resolved) => {
+                if (!err && resolved && Array.isArray(resolved._addresses)) {
+                    const ipv4Only = resolved._addresses.filter(addr => typeof addr === 'string' && !addr.includes(':'));
+                    if (ipv4Only.length > 0) {
+                        resolved._addresses = ipv4Only;
+                        resolved.host = ipv4Only[Math.floor(Math.random() * ipv4Only.length)];
+                    }
+                }
+                callback(err, resolved);
+            });
+        };
+        console.log('🛡️ [SMTP NETWORK ENFORCER]: Hook IPv4 para Nodemailer activado con éxito.');
+    }
+} catch (e) {
+    console.warn('⚠️ [SMTP NETWORK ENFORCER]: No se pudo inyectar el hook de red:', e.message);
+}
 
 // Solo activar la redirección de prueba si SMTP_TEST_MODE está explícitamente en 'true'
 let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.env.SMTP_TEST_EMAIL) ? process.env.SMTP_TEST_EMAIL : null;
@@ -10,27 +40,7 @@ let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.
 // Transporter SMTP centralizado con Pool persistente (Optimización de alta velocidad)
 let cachedTransporter = null;
 
-// Resolución garantizada a IPv4 pura
-async function resolverHostIPv4(nombreHost) {
-    // Si ya es una dirección IP (v4), retornar directo
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(nombreHost)) {
-        return nombreHost;
-    }
-    try {
-        const direcciones = await dns.promises.resolve4(nombreHost);
-        if (direcciones && direcciones.length > 0) {
-            // Seleccionar aleatoriamente una IP del pool de Google para balanceo
-            const ipElegida = direcciones[Math.floor(Math.random() * direcciones.length)];
-            return ipElegida;
-        }
-    } catch (err) {
-        console.warn(`[DNS resolve4 fallback]: No se pudo resolver ${nombreHost} por resolve4, usando host original:`, err.message);
-    }
-    return nombreHost;
-}
-
 async function crearTransporterSMTP(customPort = null, customSecure = null) {
-    const rawHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const user = process.env.SMTP_USER || '';
     const pass = process.env.SMTP_PASS || '';
 
@@ -38,41 +48,15 @@ async function crearTransporterSMTP(customPort = null, customSecure = null) {
         return null; // Aún no tiene contraseña configurada, opera en modo virtual/simulación
     }
 
-    // Para Gmail, usar directamente el servicio preconfigurado de nodemailer
-    // Esto utiliza internamente las conexiones optimizadas y compatibles con Docker/Cloud
-    if (rawHost.includes('gmail')) {
-        return nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user,
-                pass
-            },
-            tls: {
-                rejectUnauthorized: false
-            }
-        });
-    }
-
-    const port = customPort || parseInt(process.env.SMTP_PORT || '465');
-    const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
-    const ipv4Target = await resolverHostIPv4(rawHost);
-
     return nodemailer.createTransport({
-        host: ipv4Target,
-        port,
-        secure,
-        family: 4,
+        service: 'gmail',
         auth: {
             user,
             pass
         },
         tls: {
-            rejectUnauthorized: false,
-            servername: rawHost
-        },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000
+            rejectUnauthorized: false
+        }
     });
 }
 
