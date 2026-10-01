@@ -25,7 +25,12 @@ function crearTransporterSMTP(customPort = null, customSecure = null) {
         host,
         port,
         secure,
-        family: 4, // FORZAR IPV4 ESTRICTO EN EL SOCKET
+        family: 4,
+        lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { family: 4 }, (err, address, family) => {
+                callback(err, address, family);
+            });
+        },
         auth: {
             user,
             pass
@@ -33,9 +38,9 @@ function crearTransporterSMTP(customPort = null, customSecure = null) {
         tls: {
             rejectUnauthorized: false
         },
-        connectionTimeout: 6000,
-        greetingTimeout: 6000,
-        socketTimeout: 8000
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000
     });
 }
 
