@@ -24,7 +24,7 @@ router.get('/historial', async (req, res) => {
 // Diagnóstico de Conexión SMTP y Prueba en Vivo (ANTES de /:id para evitar colisiones)
 router.get(['/smtp-status', '/smtp_status'], async (req, res) => {
     const { crearTransporterSMTP } = require('../services/email.service');
-    const transporter = crearTransporterSMTP();
+    const transporter = await crearTransporterSMTP();
     res.json({
         smtp_configurado: Boolean(transporter),
         smtp_user: process.env.SMTP_USER || 'No configurado',

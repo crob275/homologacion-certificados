@@ -10,8 +10,27 @@ let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.
 // Transporter SMTP centralizado con Pool persistente (Optimización de alta velocidad)
 let cachedTransporter = null;
 
-function crearTransporterSMTP(customPort = null, customSecure = null) {
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+// Resolución garantizada a IPv4 pura
+async function resolverHostIPv4(nombreHost) {
+    // Si ya es una dirección IP (v4), retornar directo
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(nombreHost)) {
+        return nombreHost;
+    }
+    try {
+        const direcciones = await dns.promises.resolve4(nombreHost);
+        if (direcciones && direcciones.length > 0) {
+            // Seleccionar aleatoriamente una IP del pool de Google para balanceo
+            const ipElegida = direcciones[Math.floor(Math.random() * direcciones.length)];
+            return ipElegida;
+        }
+    } catch (err) {
+        console.warn(`[DNS resolve4 fallback]: No se pudo resolver ${nombreHost} por resolve4, usando host original:`, err.message);
+    }
+    return nombreHost;
+}
+
+async function crearTransporterSMTP(customPort = null, customSecure = null) {
+    const rawHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = customPort || parseInt(process.env.SMTP_PORT || '465');
     const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
     const user = process.env.SMTP_USER || '';
@@ -21,37 +40,25 @@ function crearTransporterSMTP(customPort = null, customSecure = null) {
         return null; // Aún no tiene contraseña configurada, opera en modo virtual/simulación
     }
 
+    // Resolver a IPv4 para evitar que los contenedores Linux de Railway intenten IPv6 con ENETUNREACH
+    const ipv4Target = await resolverHostIPv4(rawHost);
+
     return nodemailer.createTransport({
-        host,
+        host: ipv4Target,
         port,
         secure,
         family: 4,
-        lookup: (hostname, options, callback) => {
-            if (typeof options === 'function') {
-                callback = options;
-                options = {};
-            }
-            dns.resolve4(hostname, (err, addresses) => {
-                if (err || !addresses || addresses.length === 0) {
-                    return dns.lookup(hostname, { family: 4 }, callback);
-                }
-                if (options && options.all) {
-                    callback(null, addresses.map(a => ({ address: a, family: 4 })));
-                } else {
-                    callback(null, addresses[0], 4);
-                }
-            });
-        },
         auth: {
             user,
             pass
         },
         tls: {
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            servername: rawHost // Vital para que el certificado SSL valide smtp.gmail.com
         },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000
     });
 }
 
@@ -64,7 +71,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
     const modoTrap = process.env.SMTP_TEST_MODE === 'true';
     const destinatarioEfectivo = modoTrap ? (process.env.SMTP_TEST_EMAIL || to) : to;
 
-    let transporter = crearTransporterSMTP();
+    let transporter = await crearTransporterSMTP();
     if (!transporter) {
         console.log(`ℹ️ [SMTP VIRTUAL - PENDIENTE CREDENCIAL]: Correo listo para salir a -> ${destinatarioEfectivo} | Asunto: ${subject}`);
         return {
@@ -94,7 +101,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
 
         // Intento 2: Fallback automático a Puerto 587 STARTTLS
         try {
-            const fallbackTransporter = crearTransporterSMTP(587, false);
+            const fallbackTransporter = await crearTransporterSMTP(587, false);
             const infoFallback = await fallbackTransporter.sendMail({
                 from: fromAddress,
                 to: destinatarioEfectivo,
@@ -719,21 +726,28 @@ async function enviarReporteCargaEmpresa({ empresa, remitente, itemsProcesados }
 
     const alertaId = 'alt-emp-' + Date.now();
     
+    // Resolver destinatario válido para la empresa contratista (evitar rebotes de dominios ficticios tipo cmiindustrial.com o ingemant.pe)
+    let emailDestinoEmpresa = empresa.email_contacto;
+    const esDominioFicticio = !emailDestinoEmpresa || emailDestinoEmpresa.includes('@cmiindustrial.com') || emailDestinoEmpresa.includes('@ingemant.pe') || emailDestinoEmpresa.includes('@seleca.com') || emailDestinoEmpresa.includes('@seguridadalfa.pe');
+    if (esDominioFicticio) {
+        emailDestinoEmpresa = remitenteEmail || process.env.SMTP_USER || 'cristianre257@gmail.com';
+    }
+
     // Despacho a servidor SMTP real para la empresa contratista
     const despachoEmpresaRes = await despacharCorreoInternet({
-        to: empresa.email_contacto,
+        to: emailDestinoEmpresa,
         subject: asunto,
         html: cuerpoHTML,
         replyTo: remitenteEmail
     });
 
-    // Si el usuario que cargó tiene correo diferente, enviarle copia también
-    if (remitenteEmail && remitenteEmail !== empresa.email_contacto) {
+    // Si el usuario que cargó tiene correo diferente al enviado, enviarle copia también
+    if (remitenteEmail && remitenteEmail !== emailDestinoEmpresa) {
         await despacharCorreoInternet({
             to: remitenteEmail,
             subject: `[COPIA RESPONSABLE] ${asunto}`,
             html: cuerpoHTML,
-            replyTo: empresa.email_contacto
+            replyTo: emailDestinoEmpresa
         });
     }
 
