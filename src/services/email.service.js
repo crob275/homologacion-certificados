@@ -10,10 +10,10 @@ let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.
 // Transporter SMTP centralizado con Pool persistente (Optimización de alta velocidad)
 let cachedTransporter = null;
 
-function crearTransporterSMTP() {
+function crearTransporterSMTP(customPort = null, customSecure = null) {
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const port = parseInt(process.env.SMTP_PORT || '465');
-    const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+    const port = customPort || parseInt(process.env.SMTP_PORT || '465');
+    const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
     const user = process.env.SMTP_USER || '';
     const pass = process.env.SMTP_PASS || '';
 
@@ -21,42 +21,34 @@ function crearTransporterSMTP() {
         return null; // Aún no tiene contraseña configurada, opera en modo virtual/simulación
     }
 
-    if (!cachedTransporter) {
-        cachedTransporter = nodemailer.createTransport({
-            pool: true, // Mantener túnel abierto para envíos instantáneos
-            maxConnections: 5,
-            maxMessages: 100,
-            host,
-            port,
-            secure,
-            family: 4, // FORZAR IPV4 ESTRICTO EN EL SOCKET (Evita error ENETUNREACH con IPv6 en Railway)
-            auth: {
-                user,
-                pass
-            },
-            tls: {
-                rejectUnauthorized: false
-            },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
-        });
-    }
-
-    return cachedTransporter;
+    return nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        family: 4, // FORZAR IPV4 ESTRICTO EN EL SOCKET
+        auth: {
+            user,
+            pass
+        },
+        tls: {
+            rejectUnauthorized: false
+        },
+        connectionTimeout: 6000,
+        greetingTimeout: 6000,
+        socketTimeout: 8000
+    });
 }
 
-// Despachador de correos hacia Internet o Log Seguro
+// Despachador de correos hacia Internet con Auto-Fallback inteligente (465 SSL -> 587 STARTTLS)
 async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
-    const transporter = crearTransporterSMTP();
     const fromName = process.env.SMTP_FROM_NAME || 'HomologaControl HSE Notificaciones';
     const fromUser = process.env.SMTP_USER || 'notificaciones@homologacontrol.com';
     const fromAddress = `"${fromName}" <${fromUser}>`;
 
-    // Si el modo interceptor de pruebas está activo en .env
     const modoTrap = process.env.SMTP_TEST_MODE === 'true';
     const destinatarioEfectivo = modoTrap ? (process.env.SMTP_TEST_EMAIL || to) : to;
 
+    let transporter = crearTransporterSMTP();
     if (!transporter) {
         console.log(`ℹ️ [SMTP VIRTUAL - PENDIENTE CREDENCIAL]: Correo listo para salir a -> ${destinatarioEfectivo} | Asunto: ${subject}`);
         return {
@@ -66,6 +58,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
         };
     }
 
+    // Intento 1: Puerto primario (465 SSL)
     try {
         const info = await transporter.sendMail({
             from: fromAddress,
@@ -80,15 +73,34 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
             messageId: info.messageId,
             destinatario: destinatarioEfectivo
         };
-    } catch (smtpErr) {
-        console.error(`⚠️ [ERROR SMTP AL ENVIAR a ${destinatarioEfectivo}]:`, smtpErr.message);
-        // Si la conexión cayó, liberar el cachedTransporter para que reintente limpio en el siguiente
-        cachedTransporter = null;
-        return {
-            enviado_real: false,
-            error: smtpErr.message,
-            destinatario: destinatarioEfectivo
-        };
+    } catch (primarioErr) {
+        console.warn(`⚠️ [FALLO PUERTO 465]: ${primarioErr.message}. Reintentando automáticamente por Puerto 587 (STARTTLS)...`);
+
+        // Intento 2: Fallback automático a Puerto 587 STARTTLS
+        try {
+            const fallbackTransporter = crearTransporterSMTP(587, false);
+            const infoFallback = await fallbackTransporter.sendMail({
+                from: fromAddress,
+                to: destinatarioEfectivo,
+                replyTo: replyTo || fromUser,
+                subject: modoTrap ? `[PRUEBA TRAP] ${subject}` : subject,
+                html
+            });
+            console.log(`🚀 [SMTP REAL ENVIADO POR FALLBACK 587]: ID=${infoFallback.messageId} | Destino: ${destinatarioEfectivo}`);
+            return {
+                enviado_real: true,
+                messageId: infoFallback.messageId,
+                destinatario: destinatarioEfectivo,
+                puerto_usado: 587
+            };
+        } catch (secundarioErr) {
+            console.error(`❌ [ERROR CRÍTICO SMTP AMBOS PUERTOS]:`, secundarioErr.message);
+            return {
+                enviado_real: false,
+                error: `465: ${primarioErr.message} | 587: ${secundarioErr.message}`,
+                destinatario: destinatarioEfectivo
+            };
+        }
     }
 }
 
