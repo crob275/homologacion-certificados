@@ -63,11 +63,24 @@ async function extractTextFromPDF(pdfBuffer) {
 
 async function extraerMetadatosRealPDF(pdfBuffer, filename) {
     const text = await extractTextFromPDF(pdfBuffer);
-    console.log('📄 Texto extraído para metadatos (Longitud: ' + text.length + '):\n', text);
+    console.log('📄 [OCR INTELIGENTE]: Texto extraído (Longitud: ' + text.length + ') para archivo:', filename);
 
-    // 1. Extraer Nombre del Trabajador
+    // 1. Extraer DNI / Documento de Identidad (8 dígitos exactos)
+    let dniTrabajador = null;
+    const matchDNI = text.match(/(?:D\.?N\.?I\.?|DOC(?:UMENTO)?(?:\s+DE)?\s+IDENTIDAD|C\.?C\.?|N(?:úm|ro)?\.?\s*DOC(?:UMENTO)?)\s*[:#\.\-]?\s*([0-9]{8})\b/i);
+    if (matchDNI && matchDNI[1]) {
+        dniTrabajador = matchDNI[1];
+    } else {
+        // Buscar cualquier secuencia de 8 dígitos aislados que calce como DNI
+        const candidatosDNI = text.match(/\b([1-9][0-9]{7})\b/g);
+        if (candidatosDNI && candidatosDNI.length > 0) {
+            dniTrabajador = candidatosDNI[0];
+        }
+    }
+
+    // 2. Extraer Nombre del Trabajador
     let nombreTrabajador = null;
-    const matchNombreOtorgado = text.match(/(?:Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
+    const matchNombreOtorgado = text.match(/(?:Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
     if (matchNombreOtorgado && matchNombreOtorgado[1]) {
         nombreTrabajador = matchNombreOtorgado[1].split(/\r?\n/)[0].replace(/["'”]/g, '').trim();
     }
@@ -77,7 +90,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         for (const line of lines) {
             if (/^[A-ZÁÉÍÓÚÑ]{3,}\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?$/.test(line) && 
-                !line.includes('CERTIFICADO') && !line.includes('ELECTROTECH') && !line.includes('INGENIERO') && !line.includes('COLEGIO')) {
+                !line.includes('CERTIFICADO') && !line.includes('ELECTROTECH') && !line.includes('INGENIERO') && !line.includes('COLEGIO') && !line.includes('SEGURIDAD') && !line.includes('CAPACITACION')) {
                 nombreTrabajador = line;
                 break;
             }
@@ -85,43 +98,72 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
     }
 
     if (!nombreTrabajador) {
-        nombreTrabajador = 'Trabajador No Identificado';
+        nombreTrabajador = 'Trabajador Acreditado';
     }
 
-    // 2. Extraer Nombre del Curso
+    // 3. Extraer Nombre del Curso Normativo Minero (Taxonomía D.S. 024-2016-EM)
     let nombreCurso = null;
-    const matchCurso = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n)[\:\s]+([^\n\r;”"]{10,120})/i);
-    if (matchCurso) {
-        nombreCurso = matchCurso[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
-    }
-
-    if (!nombreCurso) {
-        nombreCurso = 'Capacitación y Certificación Técnica Normativa';
-    }
-
-    // 3. Extraer Entidad Emisora
-    let entidad = 'Instituto Certificador Especializado';
     const upperText = text.toUpperCase();
+
+    if (upperText.includes('TRABAJOS EN ALTURA') || upperText.includes('ALTURA FÍSICA') || upperText.includes('ALTURA FISICA')) {
+        nombreCurso = 'Seguridad en Trabajos en Altura Física';
+    } else if (upperText.includes('ESPACIOS CONFINADOS') || upperText.includes('ESPACIO CONFINADO')) {
+        nombreCurso = 'Seguridad en Ingreso a Espacios Confinados';
+    } else if (upperText.includes('BLOQUEO Y ETIQUETADO') || upperText.includes('LOTO') || upperText.includes('ENERGÍA PELIGROSA') || upperText.includes('ENERGIA CERO')) {
+        nombreCurso = 'Aislamiento de Energía y Bloqueo (LOTO)';
+    } else if (upperText.includes('TRABAJOS EN CALIENTE') || upperText.includes('CORTE Y SOLDADURA')) {
+        nombreCurso = 'Seguridad en Trabajos en Caliente (PETAR)';
+    } else if (upperText.includes('MATERIALES PELIGROSOS') || upperText.includes('MATPEL')) {
+        nombreCurso = 'Manejo de Materiales Peligrosos (MATPEL)';
+    } else if (upperText.includes('IPERC') || upperText.includes('IDENTIFICACION DE PELIGROS') || upperText.includes('IDENTIFICACIÓN DE PELIGROS')) {
+        nombreCurso = 'IPERC Continuo y Gestión de Riesgos Mineros';
+    } else if (upperText.includes('IZAJE') || upperText.includes('RIGGER') || upperText.includes('GRÚA') || upperText.includes('GRUA')) {
+        nombreCurso = 'Seguridad en Operaciones de Izaje y Maniobras con Grúa';
+    } else if (upperText.includes('SOLDADURA') || upperText.includes('6G') || upperText.includes('ASME IX')) {
+        nombreCurso = 'Soldadura Avanzada ASME IX y Posición 6G';
+    } else if (upperText.includes('EXCAVACIONES') || upperText.includes('ZANJAS')) {
+        nombreCurso = 'Seguridad en Excavaciones y Zanjas';
+    } else if (upperText.includes('MANEJO DEFENSIVO')) {
+        nombreCurso = 'Manejo Defensivo y Operación en Unidad Minera';
+    } else if (upperText.includes('INDUCCIÓN GENERAL') || upperText.includes('INDUCCION GENERAL') || upperText.includes('ANEXO 6') || upperText.includes('ANEXO 4') || upperText.includes('ANEXO 5')) {
+        nombreCurso = 'Inducción y Capacitación General de Seguridad Minera (Anexo 6)';
+    } else {
+        const matchCursoGenerico = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n)[\:\s]+([^\n\r;”"]{10,120})/i);
+        if (matchCursoGenerico) {
+            nombreCurso = matchCursoGenerico[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
+        } else {
+            nombreCurso = 'Capacitación en Seguridad Ocupacional y Minera';
+        }
+    }
+
+    // 4. Extraer Entidad Emisora
+    let entidad = 'Centro de Capacitación y Homologación Especializado';
     if (upperText.includes('ELECTROTECH')) {
         entidad = 'ELECTROTECH - Instituto de Capacitaciones Profesionales';
-    } else if (upperText.includes('TECSUP') || upperText.includes('TECSU')) {
-        entidad = 'TECSUP - Instituto Superior de Tecnología';
+    } else if (upperText.includes('TECSUP')) {
+        entidad = 'TECSUP del Perú';
     } else if (upperText.includes('SENATI')) {
         entidad = 'SENATI';
     } else if (upperText.includes('EBN CONSULTORES')) {
         entidad = 'EBN CONSULTORES E.I.R.L.';
     } else if (upperText.includes('SGS')) {
         entidad = 'SGS del Perú';
+    } else if (upperText.includes('BUREAU VERITAS')) {
+        entidad = 'Bureau Veritas Perú';
+    } else if (upperText.includes('CAMIPER')) {
+        entidad = 'Camiper - Cámara Minera del Perú';
+    } else if (upperText.includes('SAFETY ACADEMY')) {
+        entidad = 'Safety Academy International';
     }
 
-    // 4. Extraer Horas Lectivas
+    // 5. Extraer Horas Lectivas
     let horas = 16;
-    const matchHoras = text.match(/(\d+)\s*(?:horas|hrs|Horas|académicas)/i);
+    const matchHoras = text.match(/(\d+)\s*(?:horas|hrs|Horas|académicas|horas cronológicas)/i);
     if (matchHoras && matchHoras[1]) {
         horas = parseInt(matchHoras[1]);
     }
 
-    // 5. Extraer Fecha de Emisión (tomar la última fecha encontrada en el documento, que suele ser la de expedición/firma)
+    // 6. Extraer Fecha de Emisión
     let fechaEmision = new Date().toISOString().split('T')[0];
     const regexFechaStr = /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:del?|de)\s+(\d{4})/gi;
     const matchesFecha = [...text.matchAll(regexFechaStr)];
@@ -141,7 +183,14 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    return { nombreTrabajador, nombreCurso, entidad, horas, fechaEmision };
+    return { 
+        dniTrabajador, 
+        nombreTrabajador, 
+        nombreCurso, 
+        entidad, 
+        horas, 
+        fechaEmision 
+    };
 }
 
 module.exports = {

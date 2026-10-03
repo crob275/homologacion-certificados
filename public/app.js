@@ -71,9 +71,19 @@ function setupZone(dropzoneId, inputId, type) {
 
 function handleFileSelected(type) {
     if (type === 'pdf') {
-        const file = document.getElementById('input-file-pdf').files[0];
+        const input = document.getElementById('input-file-pdf');
+        const files = input.files;
         const preview = document.getElementById('pdf-filename-preview');
-        if (preview && file) preview.textContent = `📄 Seleccionado: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        if (preview && files && files.length > 0) {
+            if (files.length === 1) {
+                preview.textContent = `📄 Seleccionado: ${files[0].name} (${(files[0].size / 1024).toFixed(1)} KB)`;
+            } else {
+                let totalSizeMb = 0;
+                for (let i = 0; i < files.length; i++) totalSizeMb += files[i].size;
+                totalSizeMb = (totalSizeMb / (1024 * 1024)).toFixed(2);
+                preview.textContent = `📚 ${files.length} Certificados PDF seleccionados en lote (${totalSizeMb} MB total)`;
+            }
+        }
     } else if (type === 'excel') {
         const file = document.getElementById('input-file-excel').files[0];
         const preview = document.getElementById('excel-filename-preview');
@@ -765,64 +775,193 @@ function updateActiveCompanyBanner() {
     }
 }
 
-// 3. Handle Single PDF Smart OCR Upload & Auto DB Lookup
+// 3. Handle PDF Smart OCR Upload (Multi-PDF Batch & Single)
 async function handleCertificateUpload(e) {
     e.preventDefault();
     const fileInput = document.getElementById('input-file-pdf');
-    if (!fileInput.files[0]) {
-        return alert('Por favor seleccione un archivo PDF.');
+    const files = fileInput.files;
+    if (!files || files.length === 0) {
+        return alert('Por favor seleccione al menos un archivo PDF.');
     }
 
-    const formData = new FormData();
-    formData.append('pdfFile', fileInput.files[0]);
-    formData.append('empresa_id', empresaActivaId); // Scope to currently active company profile
+    const submitBtn = document.getElementById('btn-submit-pdf');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+            <span>Analizando y Extrayendo OCR (${files.length} archivo${files.length > 1 ? 's' : ''})...</span>
+        `;
+        submitBtn.style.opacity = '0.75';
+    }
+
+    const ocrBox = document.getElementById('ocr-console');
+    const ocrText = document.getElementById('ocr-output-text');
+    const badgeCount = document.getElementById('ocr-batch-count-badge');
+    ocrBox.style.display = 'block';
+    ocrText.innerHTML = '<span style="color: var(--accent-cyan);">Iniciando reconocimiento óptico minero D.S. 024-2016-EM...</span>';
 
     try {
-        const res = await fetch('/api/v1/certificados/upload', {
-            method: 'POST',
-            body: formData
-        });
-        const result = await res.json();
+        const empTarget = esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : (empresaActivaId || '');
 
-        if (!res.ok) {
-            throw new Error(result.error || 'Error procesando archivo PDF.');
+        if (files.length === 1) {
+            // Flujo Individual
+            const formData = new FormData();
+            formData.append('pdfFile', files[0]);
+            if (empTarget) formData.append('empresa_id', empTarget);
+
+            const res = await fetch('/api/v1/certificados/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error procesando archivo PDF.');
+
+            const bd = result.datos_vinculados_bd;
+            const meta = result.metadatos_extraidos_pdf;
+
+            const badgeNuevo = result.discrepancia_detectada
+                ? `<div style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 0.6rem 0.9rem; border-radius: 8px; font-weight: 600; font-size: 0.82rem; margin-bottom: 0.75rem; border: 1px solid rgba(245, 158, 11, 0.3);">
+                    Alerta de Verificación HSE: El nombre extraído en el PDF difiere parcialmente de la Ficha Maestra en BD.
+                   </div>`
+                : (result.es_nuevo_trabajador 
+                    ? `<span class="badge badge-success" style="font-size: 0.78rem; margin-bottom: 0.5rem; display: inline-block;">Nuevo Trabajador Registrado en BD</span><br>`
+                    : `<span class="badge badge-info" style="font-size: 0.78rem; margin-bottom: 0.5rem; display: inline-block;">Trabajador Existente Vinculado en BD</span><br>`);
+
+            ocrText.innerHTML = `
+                ${badgeNuevo}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 5px;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <small style="color: var(--text-secondary); display: block;">Trabajador / DNI</small>
+                        <strong style="color: #fff;">${bd.trabajador_nombres}</strong>
+                        <div style="color: var(--accent-cyan); font-size: 0.8rem; font-family: monospace;">DNI: ${bd.trabajador_documento}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <small style="color: var(--text-secondary); display: block;">Curso Acreditado</small>
+                        <strong style="color: var(--accent-amber);">${meta.curso}</strong>
+                        <div style="color: var(--text-secondary); font-size: 0.8rem;">${meta.horas} Horas &bull; ${meta.entidad}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <small style="color: var(--text-secondary); display: block;">Vigencia D.S. 024-2016-EM</small>
+                        <strong style="color: var(--success);">${meta.fecha_vencimiento_calculada}</strong>
+                        <div style="color: var(--text-secondary); font-size: 0.8rem;">Emisión: ${meta.fecha_emision}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary);">
+                    Empresa: <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc}) &bull; Notificación: <code>${bd.trabajador_email_personal}</code>
+                </div>
+            `;
+            if (badgeCount) badgeCount.style.display = 'none';
+
+        } else {
+            // Flujo Multi-PDF Batch
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('pdfFiles', files[i]);
+            }
+            if (empTarget) formData.append('empresa_id', empTarget);
+
+            const res = await fetch('/api/v1/certificados/upload-batch', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error en procesamiento multi-PDF.');
+
+            if (badgeCount) {
+                badgeCount.style.display = 'inline-block';
+                badgeCount.textContent = `${result.total_procesados} / ${result.total_recibidos} Procesados`;
+            }
+
+            let filasResultados = '';
+            (result.resultados || []).forEach((item, idx) => {
+                if (item.error) {
+                    filasResultados += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <td style="padding: 6px 10px; color: var(--text-secondary); font-size: 0.8rem;">${idx + 1}</td>
+                            <td style="padding: 6px 10px; font-size: 0.8rem; color: #fff;">${item.archivo}</td>
+                            <td colspan="4" style="padding: 6px 10px; font-size: 0.8rem; color: var(--danger);">No se pudo extraer: ${item.error}</td>
+                        </tr>
+                    `;
+                } else {
+                    const tagNuevo = item.es_nuevo_trabajador 
+                        ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">Nuevo</span>`
+                        : `<span class="badge badge-info" style="font-size: 0.7rem; padding: 2px 6px;">Existente</span>`;
+                    
+                    filasResultados += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <td style="padding: 6px 10px; color: var(--text-secondary); font-size: 0.8rem;">${idx + 1}</td>
+                            <td style="padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #fff;">
+                                ${item.trabajador.nombres}<br>
+                                <small style="color: var(--accent-cyan); font-family: monospace;">DNI: ${item.trabajador.documento}</small> ${tagNuevo}
+                            </td>
+                            <td style="padding: 6px 10px; font-size: 0.82rem; color: var(--accent-amber);">
+                                <strong>${item.certificado.curso}</strong><br>
+                                <small style="color: var(--text-secondary);">${item.certificado.horas}h &bull; ${item.certificado.entidad}</small>
+                            </td>
+                            <td style="padding: 6px 10px; font-size: 0.8rem; color: var(--text-secondary);">
+                                Emisión: ${item.certificado.fecha_emision}<br>
+                                <strong style="color: var(--success);">Vence: ${item.certificado.fecha_vencimiento}</strong>
+                            </td>
+                            <td style="padding: 6px 10px; font-size: 0.8rem;">
+                                <span class="badge badge-success" style="font-size: 0.72rem;">Registrado en BD</span>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+
+            ocrText.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; text-align: center;">
+                        <small style="color: var(--text-secondary); display: block;">Total PDFs</small>
+                        <strong style="color: #fff; font-size: 1.1rem;">${result.total_recibidos}</strong>
+                    </div>
+                    <div style="background: rgba(16, 185, 129, 0.1); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <small style="color: #a7f3d0; display: block;">Procesados</small>
+                        <strong style="color: #34d399; font-size: 1.1rem;">${result.total_procesados}</strong>
+                    </div>
+                    <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(56, 189, 248, 0.2);">
+                        <small style="color: #bae6fd; display: block;">Nuevos Trabajadores</small>
+                        <strong style="color: #38bdf8; font-size: 1.1rem;">${result.nuevos_registros}</strong>
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.1); padding: 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(245, 158, 11, 0.2);">
+                        <small style="color: #fde68a; display: block;">Actualizados</small>
+                        <strong style="color: #fbbf24; font-size: 1.1rem;">${result.actualizados}</strong>
+                    </div>
+                </div>
+
+                <div style="max-height: 280px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.04); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
+                                <th style="padding: 8px 10px;">#</th>
+                                <th style="padding: 8px 10px;">Trabajador / DNI</th>
+                                <th style="padding: 8px 10px;">Curso Minero & Horas</th>
+                                <th style="padding: 8px 10px;">Vigencia Oficial</th>
+                                <th style="padding: 8px 10px;">Estado BD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filasResultados}
+                        </tbody>
+                    </table>
+                </div>
+            `;
         }
-
-        const ocrBox = document.getElementById('ocr-console');
-        const ocrText = document.getElementById('ocr-output-text');
-        ocrBox.style.display = 'block';
-
-        const bd = result.datos_vinculados_bd;
-        const meta = result.metadatos_extraidos_pdf;
-
-        const badgeNuevo = result.discrepancia_detectada
-            ? `<div style="background: #fef3c7; color: #92400e; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.75rem; border: 1px solid #f59e0b;">
-                ⚠️ ALERTA DE DISCREPANCIA EN AUDITORÍA:<br>
-                <span style="font-weight: normal; font-size: 0.8rem;">El nombre extraído en el PDF difiere parcialmente de la Ficha Maestra en BD. Requiere verificación por Supervisor HSE.</span>
-               </div>`
-            : (result.es_nuevo_trabajador 
-                ? `<span class="badge badge-success" style="font-size: 0.85rem; margin-bottom: 0.5rem; display: inline-block;">🆕 ¡NUEVO TRABAJADOR REGISTRADO EN EL PERFIL DE ESTA EMPRESA!</span><br>`
-                : `<span class="badge badge-info" style="font-size: 0.85rem; margin-bottom: 0.5rem; display: inline-block;">👤 TRABAJADOR EXISTENTE ENCONTRADO EN BD</span><br>`);
-
-        ocrText.innerHTML = `
-            ${badgeNuevo}
-            ✓ <strong>TRABAJADOR DETECTADO EN PDF:</strong> ${bd.trabajador_nombres} (DNI: ${bd.trabajador_documento})<br>
-            ✓ <strong>CARGO ASIGNADO EN BD:</strong> ${bd.trabajador_cargo}<br>
-            ✓ <strong>CORREO PERSONAL DEL TRABAJADOR:</strong> <code>${bd.trabajador_email_personal}</code><br>
-            ✓ <strong>EMPRESA CONTRATISTA VINCULADA:</strong> <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc})<br>
-            ✓ <strong>CORREO OFICIAL DE LA EMPRESA:</strong> <code>${bd.empresa_email_contacto}</code><br>
-            <hr style="border-color: rgba(255,255,255,0.1); margin: 0.5rem 0;">
-            ✓ <strong>CURSO RECONOCIDO EN PDF:</strong> <strong>${meta.curso}</strong> (${meta.horas} hrs)<br>
-            ✓ <strong>ENTIDAD EMISORA RECONOCIDA:</strong> ${meta.entidad}<br>
-            ✓ <strong>FECHA EMISIÓN PDF:</strong> ${meta.fecha_emision} &rarr; <strong>FECHA VENCIMIENTO (1 AÑO): ${meta.fecha_vencimiento_calculada}</strong><br>
-            ✓ <strong>CÓDIGO QR / REGISTRO DIGITAL:</strong> <code>${meta.codigo_qr_validado}</code>
-        `;
 
         loadCertificados();
         loadDashboardKPIs();
         loadCompanyProfiles();
     } catch (err) {
         alert('Error en carga de PDF: ' + err.message);
+        ocrText.innerHTML = `<span style="color: var(--danger);">Error: ${err.message}</span>`;
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+            submitBtn.style.opacity = '1';
+        }
     }
 }
 

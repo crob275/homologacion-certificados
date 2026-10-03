@@ -167,6 +167,137 @@ async function uploadPDFOCR(req, res) {
     }
 }
 
+// =========================================================================
+// CARGA Y EXTRACCIÓN MASIVA MULTI-PDF (BATCH OCR MINERO)
+// Procesa múltiples archivos PDF simultáneamente con extracción inteligente
+// de DNI, nombres, curso normativo, horas y vigencias.
+// =========================================================================
+async function uploadBatchPDFOCR(req, res) {
+    try {
+        const files = req.files || (req.file ? [req.file] : []);
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'No se recibieron archivos PDF para procesar.' });
+        }
+
+        const empresaSeleccionadaId = req.body.empresa_id || 'emp-1';
+        const empresa = await getDB('SELECT * FROM empresas WHERE id = ?', [empresaSeleccionadaId]) || await getDB('SELECT * FROM empresas ORDER BY created_at ASC LIMIT 1');
+
+        const resultados = [];
+        let creados = 0;
+        let actualizados = 0;
+
+        for (const file of files) {
+            try {
+                const pdfBuffer = fs.readFileSync(file.path);
+                const extracted = await extraerMetadatosRealPDF(pdfBuffer, file.originalname);
+
+                // 1. Localizar o asociar trabajador por DNI o Nombres
+                let trabajador = null;
+
+                if (extracted.dniTrabajador && extracted.dniTrabajador.length === 8) {
+                    trabajador = await getDB('SELECT * FROM trabajadores WHERE numero_documento = ? LIMIT 1', [extracted.dniTrabajador]);
+                }
+
+                if (!trabajador && extracted.nombreTrabajador && extracted.nombreTrabajador.length > 4 && !extracted.nombreTrabajador.includes('No Identificado')) {
+                    const nombreLimpio = extracted.nombreTrabajador.trim().toLowerCase();
+                    trabajador = await getDB(
+                        `SELECT * FROM trabajadores 
+                         WHERE LOWER(CONCAT(nombres, ' ', apellidos)) = ? 
+                            OR LOWER(CONCAT(apellidos, ' ', nombres)) = ?
+                            OR (LENGTH(?) > 8 AND LOWER(CONCAT(nombres, ' ', apellidos)) LIKE ?)
+                         LIMIT 1`,
+                        [nombreLimpio, nombreLimpio, nombreLimpio, `%${nombreLimpio}%`]
+                    );
+                }
+
+                let esNuevoTrabajador = false;
+                if (!trabajador) {
+                    const nuevoId = 'tr-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                    const docFinal = extracted.dniTrabajador || String(Math.floor(Math.random() * 89999999 + 10000000));
+                    const partes = extracted.nombreTrabajador.trim().split(/\s+/);
+                    let nombres = partes[0] || 'Operario';
+                    let apellidos = partes.slice(1).join(' ') || 'General';
+
+                    await runDB(`
+                        INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, estado_habilitacion)
+                        VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, 'Técnico Especialista en Mantenimiento', 'INHABILITADO')
+                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`, '+51 987654321']);
+
+                    trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
+                    esNuevoTrabajador = true;
+                }
+
+                const fechaVencimiento = calcularFechaVencimiento(extracted.fechaEmision);
+
+                // 2. Prevenir duplicidad de certificado por curso
+                let certExistente = await getDB(
+                    'SELECT * FROM certificados WHERE trabajador_id = ? AND (LOWER(nombre_curso) = LOWER(?) OR pdf_filename = ?)',
+                    [trabajador.id, extracted.nombreCurso, file.filename]
+                );
+
+                let certId;
+                if (certExistente) {
+                    certId = certExistente.id;
+                    await runDB(`
+                        UPDATE certificados SET
+                            empresa_id = ?,
+                            nombre_curso = ?,
+                            entidad_emisora = ?,
+                            horas_lectivas = ?,
+                            fecha_emision = ?,
+                            fecha_vencimiento = ?,
+                            pdf_filename = ?,
+                            estado_validacion = 'EN_VALIDACION',
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, file.filename, certId]);
+                    actualizados++;
+                } else {
+                    certId = 'cert-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                    await runDB(`
+                        INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, estado_validacion, estado_vigencia)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
+                    `, [certId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_BATCH_' + Math.floor(Math.random() * 899999 + 100000), file.filename]);
+                    creados++;
+                }
+
+                await recalcularEstadoTrabajadorBD(trabajador.id);
+
+                resultados.push({
+                    archivo_original: file.originalname,
+                    trabajador_nombre: `${trabajador.nombres} ${trabajador.apellidos}`,
+                    trabajador_dni: trabajador.numero_documento,
+                    curso_reconocido: extracted.nombreCurso,
+                    entidad_emisora: extracted.entidad,
+                    horas: extracted.horas,
+                    fecha_emision: extracted.fechaEmision,
+                    fecha_vencimiento: fechaVencimiento,
+                    estado: certExistente ? 'ACTUALIZADO' : (esNuevoTrabajador ? 'NUEVO_TRABAJADOR' : 'REGISTRADO')
+                });
+            } catch (fileErr) {
+                console.error(`Error procesando archivo individual ${file.originalname}:`, fileErr.message);
+                resultados.push({
+                    archivo_original: file.originalname,
+                    error: fileErr.message,
+                    estado: 'ERROR_LECTURA'
+                });
+            }
+        }
+
+        res.status(201).json({
+            exito: true,
+            total_recibidos: files.length,
+            total_procesados: resultados.length,
+            nuevos_registros: creados,
+            actualizados: actualizados,
+            resultados
+        });
+    } catch (err) {
+        console.error('Error general en uploadBatchPDFOCR:', err);
+        res.status(500).json({ error: 'Fallo al procesar lote de certificados PDF: ' + err.message });
+    }
+}
+
 let cargaExcelEnProceso = false;
 
 async function cargarMasivaExcel(req, res) {
@@ -535,6 +666,7 @@ function descargarPlantillaExcel(req, res) {
 module.exports = {
     listarCertificados,
     uploadPDFOCR,
+    uploadBatchPDFOCR,
     cargarMasivaExcel,
     evaluarHomologacion,
     descargarPlantillaExcel
