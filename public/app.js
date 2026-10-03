@@ -188,29 +188,41 @@ function iniciarSesionUsuario(user) {
 
     const isCompanyUser = (user.rol === 'CONTRATISTA' || user.rol === 'OPERADOR') && user.empresa_nombre;
     if (isCompanyUser) {
-        if (logoIconElem) logoIconElem.textContent = user.empresa_logo || '🏢';
+        if (logoIconElem) logoIconElem.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #0f172a;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
         if (logoTitleElem) logoTitleElem.textContent = `Portal Contratista: ${user.empresa_nombre}`;
         if (logoSubElem) logoSubElem.textContent = user.rol === 'OPERADOR' 
-            ? `📄 Operador de Carga & Habilitación | ${user.email}` 
-            : `🏗️ Administración de Empresa & HSE | ${user.email}`;
+            ? `Operador de Acreditación de Cuadrillas | ${user.email}` 
+            : `Gestión y Homologación de Seguridad HSE | ${user.email}`;
     } else {
-        if (logoIconElem) logoIconElem.textContent = '⛏️';
+        if (logoIconElem) logoIconElem.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #0f172a;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
         if (logoTitleElem) logoTitleElem.textContent = 'HomologaControl Minería';
-        if (logoSubElem) logoSubElem.textContent = '⛰️ Control de Homologaciones Mineras, HSE & Pases de Ingreso a Planta';
+        if (logoSubElem) logoSubElem.textContent = 'Plataforma de Control Normativo D.S. 024-2016-EM & Acreditación de Cuadrillas';
     }
 
     // Render User Badge in Header
     const badgeBox = document.getElementById('user-session-badge');
-    const roleIcon = user.rol === 'ADMINISTRADOR' ? '👑' : (user.rol === 'SUPERVISOR' ? '🔍' : (user.rol === 'CONTRATISTA' ? '🏗️' : '📄'));
-    const roleLabel = user.rol === 'ADMINISTRADOR' ? 'ADMINISTRADOR' : (user.rol === 'SUPERVISOR' ? 'SUPERVISOR' : (user.rol === 'CONTRATISTA' ? 'ADMIN EMPRESA' : 'OPERADOR CARGA'));
-    const companyLabel = user.empresa_nombre ? `${user.empresa_logo || '🏢'} ${user.empresa_nombre}` : '🏛️ Acceso Global';
+    const roleIconSvg = user.rol === 'ADMINISTRADOR' 
+        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-gold);"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>`
+        : (user.rol === 'SUPERVISOR' 
+            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-cyan);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`
+            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`);
+
+    const roleLabel = user.rol === 'ADMINISTRADOR' ? 'SUPER ADMIN' : (user.rol === 'SUPERVISOR' ? 'SUPERVISOR HSE' : (user.rol === 'CONTRATISTA' ? 'ADMIN EMPRESA' : 'OPERADOR'));
+    const companyLabel = user.empresa_nombre ? user.empresa_nombre : 'Visión General Mina';
     
     badgeBox.innerHTML = `
         <div class="user-info-text">
-            <strong>${roleIcon} ${user.nombre_completo}</strong> <span class="badge badge-info" style="font-size: 0.7rem;">${roleLabel}</span><br>
-            <small style="color: var(--text-secondary)">${companyLabel}</small>
+            <strong style="display: inline-flex; align-items: center; gap: 5px;">${roleIconSvg} ${user.nombre_completo}</strong> 
+            <span class="badge badge-info" style="font-size: 0.68rem; padding: 0.2rem 0.6rem;">${roleLabel}</span><br>
+            <small style="color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; margin-top: 2px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M19 21v-4"></path><path d="M19 13V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16"></path></svg>
+                ${companyLabel}
+            </small>
         </div>
-        <button class="btn-logout" onclick="logoutUser()">🚪 Salir</button>
+        <button class="btn-logout" onclick="logoutUser()" style="display: inline-flex; align-items: center; gap: 5px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Cerrar Sesión</span>
+        </button>
     `;
 
     // Apply Privileges according to User Role

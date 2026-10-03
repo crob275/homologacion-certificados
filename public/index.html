@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomologaControl Minería - Control de Homologaciones & HSE</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons Vectoriales Modernos (Calidad Enterprise) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
@@ -108,10 +110,12 @@
             <div class="header-container">
                 <div class="header-top-row">
                     <div class="logo-section">
-                        <div class="logo-icon">⛏️</div>
+                        <div class="logo-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #0f172a;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        </div>
                         <div class="logo-text">
                             <h1>HomologaControl Minería</h1>
-                            <p>⛰️ Control de Homologaciones Mineras, HSE & Pases de Ingreso a Planta</p>
+                            <p>Plataforma de Control Normativo D.S. 024-2016-EM & Acreditación de Cuadrillas</p>
                         </div>
                     </div>
 
@@ -123,12 +127,30 @@
 
                 <div class="header-nav-row">
                     <nav class="nav-tabs">
-                        <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📊 Dashboard BI Minero</button>
-                        <button class="tab-btn" id="tab-btn-contratista" onclick="switchTab('contratista')">📤 Carga Certificados (OCR)</button>
-                        <button class="tab-btn" id="tab-btn-supervisor" onclick="switchTab('supervisor')">🔍 Auditoría Supervisor HSE</button>
-                        <button class="tab-btn" id="tab-btn-usuarios" onclick="switchTab('usuarios')">👥 Usuarios & Roles</button>
-                        <button class="tab-btn" id="tab-btn-cron" onclick="switchTab('cron')">⚡ Motor Alertas (90 días)</button>
-                        <button class="tab-btn" id="tab-btn-powerbi" onclick="switchTab('powerbi')">📈 Endpoint Power BI</button>
+                        <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                            <span>Dashboard BI Minero</span>
+                        </button>
+                        <button class="tab-btn" id="tab-btn-contratista" onclick="switchTab('contratista')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Carga de Cuadrillas & OCR</span>
+                        </button>
+                        <button class="tab-btn" id="tab-btn-supervisor" onclick="switchTab('supervisor')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                            <span>Auditoría Supervisor HSE</span>
+                        </button>
+                        <button class="tab-btn" id="tab-btn-usuarios" onclick="switchTab('usuarios')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                            <span>Gestión de Usuarios & Roles</span>
+                        </button>
+                        <button class="tab-btn" id="tab-btn-cron" onclick="switchTab('cron')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>Motor de Alertas (90d / 30d / 10d)</span>
+                        </button>
+                        <button class="tab-btn" id="tab-btn-powerbi" onclick="switchTab('powerbi')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                            <span>Conector Power BI</span>
+                        </button>
                     </nav>
                 </div>
             </div>
@@ -176,7 +198,9 @@
                         <div class="kpi-value" id="kpi-empresas">0</div>
                         <div class="kpi-subtext">Contratistas Homologadas</div>
                     </div>
-                    <div class="kpi-icon blue">🏢</div>
+                    <div class="kpi-icon blue">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M19 21v-4"></path><path d="M19 13V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16"></path><path d="M9 7h2"></path><path d="M9 11h2"></path><path d="M9 15h2"></path><path d="M13 7h2"></path><path d="M13 11h2"></path></svg>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-green">
                     <div class="kpi-info">
@@ -184,7 +208,9 @@
                         <div class="kpi-value" id="kpi-habilitados">0</div>
                         <div class="kpi-subtext">Acceso Autorizado a Planta</div>
                     </div>
-                    <div class="kpi-icon green">✅</div>
+                    <div class="kpi-icon green">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-amber">
                     <div class="kpi-info">
@@ -192,7 +218,9 @@
                         <div class="kpi-value" id="kpi-proximos">0</div>
                         <div class="kpi-subtext">Alerta Preventiva HSE</div>
                     </div>
-                    <div class="kpi-icon amber">⚠️</div>
+                    <div class="kpi-icon amber">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-red">
                     <div class="kpi-info">
@@ -200,22 +228,25 @@
                         <div class="kpi-value" id="kpi-inhabilitados">0</div>
                         <div class="kpi-subtext">Acceso Restringido en Garita</div>
                     </div>
-                    <div class="kpi-icon red">⛔</div>
+                    <div class="kpi-icon red">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                    </div>
                 </div>
             </div>
 
             <!-- BARRA DE ACCIÓN EJECUTIVA Y REPORTES EXCEL MINEROS -->
             <div class="glass-card" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-left: 4px solid var(--success);">
                 <div>
-                    <h3 style="margin: 0; color: #fff; font-size: 1.05rem;">📑 Centro de Reportes & Exportación Oficial Minera</h3>
-                    <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Descargue padrones actualizados con formato normativo D.S. 024-2016-EM para fiscalización y garita.</p>
+                    <h3 style="margin: 0; color: #fff; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        Centro de Reportes & Exportación Oficial Minera
+                    </h3>
+                    <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Descargue padrones actualizados con formato normativo D.S. 024-2016-EM para fiscalización y control de accesos.</p>
                 </div>
                 <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
-                    <a href="/api/v1/reportes/descargar-padron-excel" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; background: linear-gradient(135deg, #10b981, #047857);">
-                        <span>📊 Descargar Padrón General (.xlsx)</span>
-                    </a>
-                    <a href="/api/v1/reportes/descargar-plantilla-xlsx" class="btn-warning" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
-                        <span>📥 Plantilla Oficial Cuadrillas (.xlsx)</span>
+                    <a href="/api/v1/reportes/descargar-padron-excel" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background: linear-gradient(135deg, #10b981, #047857);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Descargar Padrón General (.xlsx)</span>
                     </a>
                 </div>
             </div>
@@ -297,26 +328,37 @@
                 <!-- MÉTODO 1: CARGA INDIVIDUAL PDF CON LECTURA INTELIGENTE OCR -->
                 <div class="glass-card upload-card">
                     <div class="card-title">
-                        <span>📄 Carga Individual PDF (Lectura OCR)</span>
-                        <span class="badge badge-info">100% Automático</span>
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-amber);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Carga Individual PDF (OCR Minero)
+                        </span>
+                        <span class="badge badge-info" style="display: inline-flex; align-items: center; gap: 4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                            Lectura Automática
+                        </span>
                     </div>
                     <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Sube el certificado digital en PDF. El motor OCR extraerá el DNI, curso y entidad emisor de forma automática.
+                        Suba el certificado digital escaneado. La inteligencia OCR extraerá y cotejará el DNI, curso acreditado y horas lectivas en la Base de Datos.
                     </p>
 
                     <form id="formUpload" onsubmit="handleCertificateUpload(event)">
                         <div class="dropzone-box" id="pdf-dropzone" onclick="document.getElementById('input-file-pdf').click()">
-                            <div class="dropzone-icon">📄</div>
+                            <div class="dropzone-icon">
+                                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-amber);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </div>
                             <div class="dropzone-text">
                                 <strong>Arrastre su archivo PDF aquí</strong>
-                                <span>o haga clic para examinar sus archivos</span>
+                                <span>o haga clic para examinar desde su equipo</span>
                             </div>
                             <div class="dropzone-file-name" id="pdf-filename-preview">Ningún archivo seleccionado</div>
                             <input type="file" id="input-file-pdf" accept=".pdf" style="display: none;" onchange="handleFileSelected('pdf')">
                         </div>
 
                         <div style="margin-top: 1rem;">
-                            <button type="submit" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem;">⚡ Escanear PDF y Registrar en BD Minera</button>
+                            <button type="submit" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"></path><path d="M20 12l-4-4"></path><path d="M20 12l-4 4"></path></svg>
+                                <span>Escanear OCR y Validar Habilitación</span>
+                            </button>
                         </div>
                     </form>
 
@@ -328,30 +370,40 @@
 
                 <!-- MÉTODO 2: CARGA MASIVA EN EXCEL / CSV -->
                 <div class="glass-card upload-card">
-                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                        <span>📊 Carga Masiva Excel / CSV</span>
-                        <div style="display: flex; gap: 6px;">
-                            <a href="/api/v1/reportes/descargar-plantilla-xlsx" class="btn-primary" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white;">📥 Plantilla Oficial (.xlsx)</a>
-                            <a href="/plantilla_empleados_prueba.xlsx" download="plantilla_empleados_prueba.xlsx" class="btn-warning" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; color: white;">📄 Ejemplo (.xlsx)</a>
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-cyan);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Carga Masiva de Cuadrillas
+                        </span>
+                        <div>
+                            <a href="/api/v1/reportes/descargar-plantilla-xlsx" class="btn-primary" style="text-decoration: none; font-size: 0.8rem; padding: 0.45rem 0.95rem; background: linear-gradient(135deg, #059669, #047857); color: white; display: inline-flex; align-items: center; gap: 6px;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                <span>Descargar Plantilla (.xlsx)</span>
+                            </a>
                         </div>
                     </div>
                     <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Sube la lista de cuadrillas en Excel (.xlsx / .csv). El sistema procesará en batch todas las filas, evaluará vigencias y disparará notificaciones.
+                        Suba la matriz de personal en formato Excel. El motor procesará automáticamente los registros, calculará vigencias (D.S. 024-2016-EM) y emitirá notificaciones.
                     </p>
 
                     <form id="formExcelUpload" onsubmit="handleExcelUpload(event)">
                         <div class="dropzone-box dropzone-excel" id="excel-dropzone" onclick="document.getElementById('input-file-excel').click()">
-                            <div class="dropzone-icon">📊</div>
+                            <div class="dropzone-icon">
+                                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg>
+                            </div>
                             <div class="dropzone-text">
-                                <strong>Arrastre su lista Excel (.csv) aquí</strong>
-                                <span>o haga clic para seleccionar el archivo</span>
+                                <strong>Arrastre su archivo Excel aquí</strong>
+                                <span>o haga clic para seleccionar desde su equipo</span>
                             </div>
                             <div class="dropzone-file-name" id="excel-filename-preview">Ningún archivo seleccionado</div>
                             <input type="file" id="input-file-excel" accept=".csv, .xlsx" style="display: none;" onchange="handleFileSelected('excel')">
                         </div>
 
                         <div style="margin-top: 1rem;">
-                            <button type="submit" id="btn-submit-excel" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; background: linear-gradient(135deg, var(--success), #059669); color: white;">🚀 Procesar Carga Masiva Excel</button>
+                            <button type="submit" id="btn-submit-excel" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 0.95rem; background: linear-gradient(135deg, #10b981, #059669); color: white; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg>
+                                <span>Procesar y Acreditar Cuadrilla</span>
+                            </button>
                         </div>
                     </form>
 
