@@ -6,6 +6,8 @@ const certificadosController = require('../controllers/certificados.controller')
 router.get('/dashboard-kpis', reportesController.getDashboardKPIs);
 router.get('/powerbi-metrics', reportesController.getReportePowerBI);
 router.get('/plantilla-excel', certificadosController.descargarPlantillaExcel);
+router.get('/descargar-plantilla-xlsx', reportesController.descargarPlantillaOficialExcel);
+router.get('/descargar-padron-excel', reportesController.descargarPadronExcel);
 
 // Rutas de Alertas Automatizadas y Correo 90 Días
 router.post('/alertas/ejecutar-escaneo', reportesController.ejecutarEscaneoAlertas);
