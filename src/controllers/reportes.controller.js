@@ -73,11 +73,46 @@ async function enviarAlertaIndividualController(req, res) {
     }
 }
 
+// Descarga en vivo del Padrón General de Mina en Excel (.xlsx)
+async function descargarPadronExcel(req, res) {
+    try {
+        const empresaId = req.query.empresa_id || null;
+        const { obtenerReportePowerBI } = require('../services/metrics.service');
+        const { generarExcelPadronGeneral } = require('../services/excel.service');
+
+        const data = await obtenerReportePowerBI(empresaId);
+        const excelBuffer = generarExcelPadronGeneral(data);
+
+        const fechaStr = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Padron_General_Homologacion_Minera_${fechaStr}.xlsx"`);
+        res.send(excelBuffer);
+    } catch (err) {
+        res.status(500).json({ error: 'Error generando archivo Excel: ' + err.message });
+    }
+}
+
+// Descarga de la Plantilla Oficial Excel (.xlsx) con validaciones
+function descargarPlantillaOficialExcel(req, res) {
+    try {
+        const { generarPlantillaOficialXLSX } = require('../services/excel.service');
+        const excelBuffer = generarPlantillaOficialXLSX();
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Plantilla_Oficial_Carga_Cuadrillas_HSE.xlsx"');
+        res.send(excelBuffer);
+    } catch (err) {
+        res.status(500).json({ error: 'Error generando plantilla: ' + err.message });
+    }
+}
+
 module.exports = {
     getDashboardKPIs,
     getReportePowerBI,
     ejecutarEscaneoAlertas,
     getHistorialAlertasController,
     configurarModoPruebaEmail,
-    enviarAlertaIndividualController
+    enviarAlertaIndividualController,
+    descargarPadronExcel,
+    descargarPlantillaOficialExcel
 };

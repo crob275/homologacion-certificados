@@ -204,6 +204,22 @@
                 </div>
             </div>
 
+            <!-- BARRA DE ACCIÓN EJECUTIVA Y REPORTES EXCEL MINEROS -->
+            <div class="glass-card" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-left: 4px solid var(--success);">
+                <div>
+                    <h3 style="margin: 0; color: #fff; font-size: 1.05rem;">📑 Centro de Reportes & Exportación Oficial Minera</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Descargue padrones actualizados con formato normativo D.S. 024-2016-EM para fiscalización y garita.</p>
+                </div>
+                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                    <a href="/api/v1/reportes/descargar-padron-excel" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; background: linear-gradient(135deg, #10b981, #047857);">
+                        <span>📊 Descargar Padrón General (.xlsx)</span>
+                    </a>
+                    <a href="/api/v1/reportes/descargar-plantilla-xlsx" class="btn-warning" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        <span>📥 Plantilla Oficial Cuadrillas (.xlsx)</span>
+                    </a>
+                </div>
+            </div>
+
             <!-- Resumen por Empresa Contratista -->
             <div class="glass-card">
                 <div class="card-title">
@@ -315,12 +331,12 @@
                     <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                         <span>📊 Carga Masiva Excel / CSV</span>
                         <div style="display: flex; gap: 6px;">
-                            <a href="/plantilla_empleados_prueba.xlsx" download="plantilla_empleados_prueba.xlsx" class="btn-primary" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white;">📥 Descargar Excel de Prueba (.xlsx)</a>
-                            <a href="/api/v1/plantilla/descargar-excel" class="btn-warning" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; color: white;">📄 Plantilla (.csv)</a>
+                            <a href="/api/v1/reportes/descargar-plantilla-xlsx" class="btn-primary" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white;">📥 Plantilla Oficial (.xlsx)</a>
+                            <a href="/plantilla_empleados_prueba.xlsx" download="plantilla_empleados_prueba.xlsx" class="btn-warning" style="text-decoration: none; font-size: 0.75rem; padding: 0.35rem 0.75rem; color: white;">📄 Ejemplo (.xlsx)</a>
                         </div>
                     </div>
                     <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Sube la lista de cuadrillas en Excel (.csv). El sistema procesará en batch todas las filas y actualizará vigencias.
+                        Sube la lista de cuadrillas en Excel (.xlsx / .csv). El sistema procesará en batch todas las filas, evaluará vigencias y disparará notificaciones.
                     </p>
 
                     <form id="formExcelUpload" onsubmit="handleExcelUpload(event)">
