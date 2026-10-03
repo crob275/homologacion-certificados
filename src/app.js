@@ -31,6 +31,7 @@ app.use('/api/v1/usuarios', usuariosRoutes);
 app.use('/api/v1/trabajadores', trabajadoresRoutes);
 app.use('/api/v1/certificados', certificadosRoutes);
 app.use('/api/v1/alertas', alertasRoutes);
+app.use('/api/v1/reportes', reportesRoutes);
 
 // Rutas de Dashboard y Reportes Power BI
 app.use('/api/v1/dashboard', express.Router().get('/kpis', require('./controllers/reportes.controller').getDashboardKPIs));
