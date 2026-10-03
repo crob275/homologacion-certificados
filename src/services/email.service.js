@@ -40,7 +40,10 @@ let correoPruebaRedireccion = (process.env.SMTP_TEST_MODE === 'true' && process.
 // Transporter SMTP centralizado con Pool persistente (Optimización de alta velocidad)
 let cachedTransporter = null;
 
-async function crearTransporterSMTP(customPort = null, customSecure = null) {
+function crearTransporterSMTP(customPort = null, customSecure = null) {
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = customPort || parseInt(process.env.SMTP_PORT || '465');
+    const secure = (customSecure !== null) ? customSecure : (process.env.SMTP_SECURE === 'true' || port === 465);
     const user = process.env.SMTP_USER || '';
     const pass = process.env.SMTP_PASS || '';
 
@@ -49,6 +52,26 @@ async function crearTransporterSMTP(customPort = null, customSecure = null) {
     }
 
     return nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        family: 4,
+        lookup: (hostname, options, callback) => {
+            if (typeof options === 'function') {
+                callback = options;
+                options = {};
+            }
+            dns.resolve4(hostname, (err, addresses) => {
+                if (err || !addresses || addresses.length === 0) {
+                    return dns.lookup(hostname, { family: 4 }, callback);
+                }
+                if (options && options.all) {
+                    callback(null, addresses.map(a => ({ address: a, family: 4 })));
+                } else {
+                    callback(null, addresses[0], 4);
+                }
+            });
+        },
         service: 'gmail',
         auth: {
             user,
@@ -56,11 +79,71 @@ async function crearTransporterSMTP(customPort = null, customSecure = null) {
         },
         tls: {
             rejectUnauthorized: false
-        }
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000
     });
 }
 
-// Despachador de correos hacia Internet con Auto-Fallback inteligente (465 SSL -> 587 STARTTLS)
+// Despachador HTTPS de Alta Velocidad (Resend API - Puerto 443 Inmune a Firewalls)
+async function despacharViaResendHTTPS({ to, subject, html, replyTo = null }) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) return null;
+
+    const https = require('https');
+    return new Promise((resolve) => {
+        const payload = JSON.stringify({
+            from: 'HomologaControl HSE <onboarding@resend.dev>',
+            to: Array.isArray(to) ? to : [to],
+            reply_to: replyTo || process.env.SMTP_USER || 'cristianre257@gmail.com',
+            subject: subject,
+            html: html
+        });
+
+        const req = https.request({
+            hostname: 'api.resend.com',
+            port: 443,
+            path: '/emails',
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey.trim()}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            },
+            timeout: 8000
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve({ success: true, id: parsed.id, raw: data });
+                    } catch (e) {
+                        resolve({ success: true, id: 'OK', raw: data });
+                    }
+                } else {
+                    resolve({ success: false, error: `HTTP ${res.statusCode}: ${data}` });
+                }
+            });
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({ success: false, error: 'Resend API Timeout (8s)' });
+        });
+
+        req.on('error', (err) => {
+            resolve({ success: false, error: err.message });
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
+// Despachador unificado hacia Internet: Prioridad HTTPS Resend -> Fallback SMTP
 async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
     const fromName = process.env.SMTP_FROM_NAME || 'HomologaControl HSE Notificaciones';
     const fromUser = process.env.SMTP_USER || 'notificaciones@homologacontrol.com';
@@ -68,8 +151,37 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
 
     const modoTrap = process.env.SMTP_TEST_MODE === 'true';
     const destinatarioEfectivo = modoTrap ? (process.env.SMTP_TEST_EMAIL || to) : to;
+    const asuntoFinal = modoTrap ? `[PRUEBA TRAP] ${subject}` : subject;
 
-    let transporter = await crearTransporterSMTP();
+    // 1. CANAL PRIMARIO ULTRA-CONFIABLE: HTTPS RESEND (Puerto 443)
+    if (process.env.RESEND_API_KEY) {
+        try {
+            console.log(`🌐 [DESPACHO HTTPS]: Enviando correo por Resend API (Puerto 443) a -> ${destinatarioEfectivo}`);
+            const resendRes = await despacharViaResendHTTPS({
+                to: destinatarioEfectivo,
+                subject: asuntoFinal,
+                html,
+                replyTo: replyTo || fromUser
+            });
+
+            if (resendRes && resendRes.success) {
+                console.log(`🚀 [CORREO HTTPS ENVIADO CON ÉXITO]: ID=${resendRes.id} | Destino: ${destinatarioEfectivo}`);
+                return {
+                    enviado_real: true,
+                    messageId: resendRes.id,
+                    destinatario: destinatarioEfectivo,
+                    metodo: 'HTTPS_RESEND'
+                };
+            } else {
+                console.warn(`⚠️ [RESEND HTTPS NO COMPLETADO]: ${resendRes?.error}. Pasando a fallback SMTP...`);
+            }
+        } catch (resendErr) {
+            console.warn(`⚠️ [RESEND HTTPS ERROR]: ${resendErr.message}. Pasando a fallback SMTP...`);
+        }
+    }
+
+    // 2. CANAL SECUNDARIO: SMTP (Puertos 465 / 587)
+    let transporter = crearTransporterSMTP();
     if (!transporter) {
         console.log(`ℹ️ [SMTP VIRTUAL - PENDIENTE CREDENCIAL]: Correo listo para salir a -> ${destinatarioEfectivo} | Asunto: ${subject}`);
         return {
@@ -79,32 +191,33 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
         };
     }
 
-    // Intento 1: Puerto primario (465 SSL)
+    // Intento 2.1: Puerto primario (465 SSL)
     try {
         const info = await transporter.sendMail({
             from: fromAddress,
             to: destinatarioEfectivo,
             replyTo: replyTo || fromUser,
-            subject: modoTrap ? `[PRUEBA TRAP] ${subject}` : subject,
+            subject: asuntoFinal,
             html
         });
         console.log(`🚀 [SMTP REAL ENVIADO CON ÉXITO]: ID=${info.messageId} | Destino: ${destinatarioEfectivo}`);
         return {
             enviado_real: true,
             messageId: info.messageId,
-            destinatario: destinatarioEfectivo
+            destinatario: destinatarioEfectivo,
+            metodo: 'SMTP_465'
         };
     } catch (primarioErr) {
         console.warn(`⚠️ [FALLO PUERTO 465]: ${primarioErr.message}. Reintentando automáticamente por Puerto 587 (STARTTLS)...`);
 
-        // Intento 2: Fallback automático a Puerto 587 STARTTLS
+        // Intento 2.2: Fallback a Puerto 587 STARTTLS
         try {
-            const fallbackTransporter = await crearTransporterSMTP(587, false);
+            const fallbackTransporter = crearTransporterSMTP(587, false);
             const infoFallback = await fallbackTransporter.sendMail({
                 from: fromAddress,
                 to: destinatarioEfectivo,
                 replyTo: replyTo || fromUser,
-                subject: modoTrap ? `[PRUEBA TRAP] ${subject}` : subject,
+                subject: asuntoFinal,
                 html
             });
             console.log(`🚀 [SMTP REAL ENVIADO POR FALLBACK 587]: ID=${infoFallback.messageId} | Destino: ${destinatarioEfectivo}`);
@@ -112,7 +225,8 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
                 enviado_real: true,
                 messageId: infoFallback.messageId,
                 destinatario: destinatarioEfectivo,
-                puerto_usado: 587
+                puerto_usado: 587,
+                metodo: 'SMTP_587'
             };
         } catch (secundarioErr) {
             console.error(`❌ [ERROR CRÍTICO SMTP AMBOS PUERTOS]:`, secundarioErr.message);
@@ -731,7 +845,7 @@ async function enviarReporteCargaEmpresa({ empresa, remitente, itemsProcesados }
         emailDestinoEmpresa = remitenteEmail || process.env.SMTP_USER || 'cristianre257@gmail.com';
     }
 
-    // Despacho a servidor SMTP real para la empresa contratista
+    // Despacho a servidor SMTP/HTTPS real para la empresa contratista
     const despachoEmpresaRes = await despacharCorreoInternet({
         to: emailDestinoEmpresa,
         subject: asunto,
