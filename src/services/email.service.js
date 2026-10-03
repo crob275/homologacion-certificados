@@ -86,7 +86,78 @@ function crearTransporterSMTP(customPort = null, customSecure = null) {
     });
 }
 
-// Despachador HTTPS de Alta Velocidad (Resend API - Puerto 443 Inmune a Firewalls)
+// Despachador HTTPS Universal (Brevo API - Puerto 443 Inmune a Firewalls y Acepta Todos los Destinatarios)
+async function despacharViaBrevoHTTPS({ to, subject, html, replyTo = null }) {
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) return null;
+
+    const destinatarios = (Array.isArray(to) ? to : [to]).map(correo => ({
+        email: typeof correo === 'string' ? correo.trim() : (correo.email || '').trim()
+    })).filter(d => d.email.length > 0);
+
+    if (destinatarios.length === 0) return null;
+
+    const fromName = process.env.SMTP_FROM_NAME || 'HomologaControl HSE Notificaciones';
+    const fromEmail = process.env.SMTP_USER || 'cristianre257@gmail.com';
+
+    const https = require('https');
+    return new Promise((resolve) => {
+        const payload = JSON.stringify({
+            sender: {
+                name: fromName,
+                email: fromEmail
+            },
+            to: destinatarios,
+            replyTo: {
+                email: replyTo || fromEmail
+            },
+            subject: subject,
+            htmlContent: html
+        });
+
+        const req = https.request({
+            hostname: 'api.brevo.com',
+            port: 443,
+            path: '/v3/smtp/email',
+            method: 'POST',
+            headers: {
+                'api-key': apiKey.trim(),
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            },
+            timeout: 10000
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve({ success: true, id: parsed.messageId || 'OK', raw: data });
+                    } catch (e) {
+                        resolve({ success: true, id: 'OK', raw: data });
+                    }
+                } else {
+                    resolve({ success: false, error: `HTTP ${res.statusCode}: ${data}` });
+                }
+            });
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({ success: false, error: 'Brevo API Timeout (10s)' });
+        });
+
+        req.on('error', (err) => {
+            resolve({ success: false, error: err.message });
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
+// Despachador HTTPS de Alta Velocidad (Resend API - Puerto 443)
 async function despacharViaResendHTTPS({ to, subject, html, replyTo = null }) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return null;
@@ -143,7 +214,7 @@ async function despacharViaResendHTTPS({ to, subject, html, replyTo = null }) {
     });
 }
 
-// Despachador unificado hacia Internet: Prioridad HTTPS Resend -> Fallback SMTP
+// Despachador unificado hacia Internet: Prioridad Brevo HTTPS -> Resend HTTPS -> Fallback SMTP
 async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
     const fromName = process.env.SMTP_FROM_NAME || 'HomologaControl HSE Notificaciones';
     const fromUser = process.env.SMTP_USER || 'notificaciones@homologacontrol.com';
@@ -153,10 +224,37 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
     const destinatarioEfectivo = modoTrap ? (process.env.SMTP_TEST_EMAIL || to) : to;
     const asuntoFinal = modoTrap ? `[PRUEBA TRAP] ${subject}` : subject;
 
-    // 1. CANAL PRIMARIO ULTRA-CONFIABLE: HTTPS RESEND (Puerto 443)
+    // 1. CANAL PRIMARIO ULTRA-CONFIABLE UNIVERSAL: HTTPS BREVO (Puerto 443 - Envía a TODOS los correos sin restricción)
+    if (process.env.BREVO_API_KEY) {
+        try {
+            console.log(`🌐 [DESPACHO HTTPS BREVO]: Enviando correo por Brevo API a -> ${destinatarioEfectivo}`);
+            const brevoRes = await despacharViaBrevoHTTPS({
+                to: destinatarioEfectivo,
+                subject: asuntoFinal,
+                html,
+                replyTo: replyTo || fromUser
+            });
+
+            if (brevoRes && brevoRes.success) {
+                console.log(`🚀 [CORREO BREVO ENVIADO CON ÉXITO]: ID=${brevoRes.id} | Destino: ${destinatarioEfectivo}`);
+                return {
+                    enviado_real: true,
+                    messageId: brevoRes.id,
+                    destinatario: destinatarioEfectivo,
+                    metodo: 'HTTPS_BREVO'
+                };
+            } else {
+                console.warn(`⚠️ [BREVO HTTPS NO COMPLETADO]: ${brevoRes?.error}. Pasando a siguiente método...`);
+            }
+        } catch (brevoErr) {
+            console.warn(`⚠️ [BREVO HTTPS ERROR]: ${brevoErr.message}. Pasando a siguiente método...`);
+        }
+    }
+
+    // 2. CANAL SECUNDARIO: HTTPS RESEND (Puerto 443)
     if (process.env.RESEND_API_KEY) {
         try {
-            console.log(`🌐 [DESPACHO HTTPS]: Enviando correo por Resend API (Puerto 443) a -> ${destinatarioEfectivo}`);
+            console.log(`🌐 [DESPACHO HTTPS RESEND]: Enviando correo por Resend API a -> ${destinatarioEfectivo}`);
             const resendRes = await despacharViaResendHTTPS({
                 to: destinatarioEfectivo,
                 subject: asuntoFinal,
@@ -165,7 +263,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
             });
 
             if (resendRes && resendRes.success) {
-                console.log(`🚀 [CORREO HTTPS ENVIADO CON ÉXITO]: ID=${resendRes.id} | Destino: ${destinatarioEfectivo}`);
+                console.log(`🚀 [CORREO RESEND ENVIADO CON ÉXITO]: ID=${resendRes.id} | Destino: ${destinatarioEfectivo}`);
                 return {
                     enviado_real: true,
                     messageId: resendRes.id,
@@ -180,7 +278,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
         }
     }
 
-    // 2. CANAL SECUNDARIO: SMTP (Puertos 465 / 587)
+    // 3. CANAL TERCIARIO: SMTP (Puertos 465 / 587)
     let transporter = crearTransporterSMTP();
     if (!transporter) {
         console.log(`ℹ️ [SMTP VIRTUAL - PENDIENTE CREDENCIAL]: Correo listo para salir a -> ${destinatarioEfectivo} | Asunto: ${subject}`);
@@ -191,7 +289,7 @@ async function despacharCorreoInternet({ to, subject, html, replyTo = null }) {
         };
     }
 
-    // Intento 2.1: Puerto primario (465 SSL)
+    // Intento 3.1: Puerto primario (465 SSL)
     try {
         const info = await transporter.sendMail({
             from: fromAddress,
