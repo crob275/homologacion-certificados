@@ -338,9 +338,21 @@ async function loadUsuariosList() {
                     <td>${u.cargo || 'Gestor'}</td>
                     <td><small style="color: var(--text-secondary);">${u.ultimo_login ? new Date(u.ultimo_login).toLocaleString() : 'Pendiente'}</small></td>
                     <td>
-                        <button class="btn-warning" onclick="openEditUserModal('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">✏️ Editar</button>
-                        <button class="btn-primary" onclick="resetUserPassword('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: linear-gradient(135deg, #f59e0b, #d97706); margin-left: 0.25rem;">🔑 Reset Clave</button>
-                        ${u.rol !== 'ADMINISTRADOR' ? `<button class="btn-danger" onclick="deleteUser('${u.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; cursor: pointer; margin-left: 0.25rem;">🗑️ Eliminar</button>` : ''}
+                        <div class="table-btn-group">
+                            <button class="table-btn-action table-btn-edit" onclick="openEditUserModal('${u.id}')" title="Editar Usuario">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                <span>Editar</span>
+                            </button>
+                            <button class="table-btn-action table-btn-reset" onclick="resetUserPassword('${u.id}')" title="Restablecer Contraseña">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                                <span>Reset Clave</span>
+                            </button>
+                            ${u.rol !== 'ADMINISTRADOR' ? `
+                            <button class="table-btn-action table-btn-delete" onclick="deleteUser('${u.id}')" title="Eliminar Acceso">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                <span>Eliminar</span>
+                            </button>` : ''}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1210,7 +1222,10 @@ async function loadCertificados() {
                     <td>${badgeAudit}</td>
                     <td>${badgeVigencia}</td>
                     <td>
-                        <button class="btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;" onclick="enviarAlertaIndividualJS('${c.id}')">✉️ Enviar Correo</button>
+                        <button class="table-btn-action" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;" onclick="enviarAlertaIndividualJS('${c.id}')" title="Despachar Notificación Oficial">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            <span>Notificar</span>
+                        </button>
                     </td>
                 </tr>
             `;
