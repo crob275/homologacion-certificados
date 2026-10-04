@@ -1222,10 +1222,16 @@ async function loadCertificados() {
                     <td>${badgeAudit}</td>
                     <td>${badgeVigencia}</td>
                     <td>
-                        <button class="table-btn-action" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;" onclick="enviarAlertaIndividualJS('${c.id}')" title="Despachar Notificación Oficial">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                            <span>Notificar</span>
-                        </button>
+                        <div class="table-btn-group">
+                            <button class="table-btn-action table-btn-edit" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" title="Editar Información del Empleado">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                <span>Editar</span>
+                            </button>
+                            <button class="table-btn-action" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;" onclick="enviarAlertaIndividualJS('${c.id}')" title="Despachar Notificación Oficial">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                <span>Notificar</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1839,6 +1845,75 @@ async function reenviarFichaKioscoCorreo() {
         abrirModalKiosco(datosKioscoActivo);
     } catch (err) {
         alert('Error en reenvío de notificación: ' + err.message);
+    }
+}
+
+// =========================================================================
+// EDICIÓN DIRECTA DE DATOS DEL TRABAJADOR (DESDE TABLA Y CERTIFICADOS)
+// =========================================================================
+let trabajadorEditandoId = null;
+
+async function abrirModalEditarTrabajador(trabajadorId) {
+    if (!trabajadorId) return alert('ID de trabajador no válido.');
+    trabajadorEditandoId = trabajadorId;
+
+    try {
+        const res = await fetch('/api/v1/trabajadores');
+        const trabs = await res.json();
+        const trab = trabs.find(t => t.id === trabajadorId);
+
+        if (!trab) return alert('No se encontraron los datos del empleado.');
+
+        document.getElementById('modal-trab-id').value = trab.id;
+        document.getElementById('modal-trab-nombres').value = trab.nombres || '';
+        document.getElementById('modal-trab-apellidos').value = trab.apellidos || '';
+        document.getElementById('modal-trab-doc').value = trab.numero_documento || '';
+        document.getElementById('modal-trab-email').value = trab.email_personal || '';
+        document.getElementById('modal-trab-telefono').value = trab.telefono_personal || '';
+        document.getElementById('modal-trab-cargo').value = trab.cargo_puesto || '';
+
+        const modal = document.getElementById('modal-editar-trabajador');
+        if (modal) modal.style.display = 'flex';
+    } catch (err) {
+        alert('Error cargando datos del empleado: ' + err.message);
+    }
+}
+
+function closeEditTrabajadorModal() {
+    const modal = document.getElementById('modal-editar-trabajador');
+    if (modal) modal.style.display = 'none';
+}
+
+async function handleSaveTrabajadorEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('modal-trab-id').value;
+    if (!id) return;
+
+    const payload = {
+        nombres: document.getElementById('modal-trab-nombres').value.trim(),
+        apellidos: document.getElementById('modal-trab-apellidos').value.trim(),
+        numero_documento: document.getElementById('modal-trab-doc').value.trim(),
+        email_personal: document.getElementById('modal-trab-email').value.trim(),
+        telefono_personal: document.getElementById('modal-trab-telefono').value.trim(),
+        cargo_puesto: document.getElementById('modal-trab-cargo').value.trim()
+    };
+
+    try {
+        const res = await fetch(`/api/v1/trabajadores/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al actualizar empleado.');
+
+        alert('¡Datos del empleado actualizados exitosamente en la Base de Datos!');
+        closeEditTrabajadorModal();
+        loadCertificados();
+        loadDashboardKPIs();
+    } catch (err) {
+        alert('Error guardando cambios: ' + err.message);
     }
 }
 

@@ -139,10 +139,15 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    // Detección especial para el titular Christian Renato Ortega Bernedo si el texto OCR contiene sus variantes
-    if (!nombreTrabajador || nombreTrabajador.toLowerCase().includes('chuistian') || nombreTrabajador.toLowerCase().includes('odega')) {
-        if (/ch[ru]istian/i.test(text) && /ortega|odega/i.test(text) && /bernedo/i.test(text)) {
-            nombreTrabajador = 'Christian Renato Ortega Bernedo';
+    // Estrategia 2.4: Si el PDF es un scan cerrado o imagen pura no indexable, extraer el nombre del archivo si contiene nombres
+    if (!nombreTrabajador || nombreTrabajador === 'Trabajador Acreditado') {
+        if (filename && typeof filename === 'string') {
+            const raw = filename.replace(/\(Autosaved\)/ig, '').replace(/\.pdf$/i, '');
+            const parts = raw.split(/[-_\s]+/);
+            const words = parts.filter(p => /^[a-zA-ZáéíóúÁÉÍÓÚñÑ]{3,}$/.test(p) && !['certificado','constancia','diploma','reconocimiento','pdf'].includes(p.toLowerCase()));
+            if (words.length >= 2) {
+                nombreTrabajador = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+            }
         }
     }
 
