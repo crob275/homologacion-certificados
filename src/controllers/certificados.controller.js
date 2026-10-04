@@ -747,11 +747,71 @@ function descargarPlantillaExcel(req, res) {
     res.send(csvContent);
 }
 
+async function eliminarCertificado(req, res) {
+    try {
+        const { id } = req.params;
+        const cert = await getDB('SELECT * FROM certificados WHERE id = ?', [id]);
+        if (!cert) return res.status(404).json({ error: 'Certificado no encontrado.' });
+
+        const trabajadorId = cert.trabajador_id;
+
+        // Eliminar homologaciones y alertas vinculadas si las hay
+        try {
+            await runDB('DELETE FROM homologaciones WHERE certificado_id = ?', [id]);
+            await runDB('DELETE FROM alertas_notificaciones WHERE certificado_id = ?', [id]);
+        } catch(e) {}
+
+        await runDB('DELETE FROM certificados WHERE id = ?', [id]);
+
+        // Recalcular estado del trabajador tras eliminar
+        if (trabajadorId) {
+            await recalcularEstadoTrabajadorBD(trabajadorId);
+        }
+
+        res.json({ exito: true, message: 'Certificado eliminado de la Base de Datos exitosamente.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error eliminando certificado: ' + err.message });
+    }
+}
+
+async function actualizarCertificado(req, res) {
+    try {
+        const { id } = req.params;
+        const { nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, estado_validacion } = req.body;
+
+        const cert = await getDB('SELECT * FROM certificados WHERE id = ?', [id]);
+        if (!cert) return res.status(404).json({ error: 'Certificado no encontrado.' });
+
+        await runDB(`
+            UPDATE certificados SET
+                nombre_curso = COALESCE(?, nombre_curso),
+                entidad_emisora = COALESCE(?, entidad_emisora),
+                horas_lectivas = COALESCE(?, horas_lectivas),
+                fecha_emision = COALESCE(?, fecha_emision),
+                fecha_vencimiento = COALESCE(?, fecha_vencimiento),
+                estado_validacion = COALESCE(?, estado_validacion),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `, [nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, estado_validacion, id]);
+
+        if (cert.trabajador_id) {
+            await recalcularEstadoTrabajadorBD(cert.trabajador_id);
+        }
+
+        const certActualizado = await getDB('SELECT * FROM certificados WHERE id = ?', [id]);
+        res.json({ exito: true, message: 'Certificado actualizado.', certificado: certActualizado });
+    } catch (err) {
+        res.status(500).json({ error: 'Error actualizando certificado: ' + err.message });
+    }
+}
+
 module.exports = {
     listarCertificados,
     uploadPDFOCR,
     uploadBatchPDFOCR,
     cargarMasivaExcel,
     evaluarHomologacion,
-    descargarPlantillaExcel
+    descargarPlantillaExcel,
+    eliminarCertificado,
+    actualizarCertificado
 };

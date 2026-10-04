@@ -1231,6 +1231,10 @@ async function loadCertificados() {
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                                 <span>Notificar</span>
                             </button>
+                            <button class="table-btn-action table-btn-delete" onclick="eliminarCertificadoJS('${c.id}')" title="Eliminar Registro de Certificado">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                <span>Eliminar</span>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -1917,11 +1921,36 @@ async function handleSaveTrabajadorEdit(e) {
     }
 }
 
+async function eliminarCertificadoJS(certId) {
+    if (!certId) return alert('ID de certificado no válido.');
+    if (!confirm('¿Está seguro de eliminar este certificado de la Base de Datos? Esta acción recalculará la habilitación del trabajador y no se puede deshacer.')) return;
+    
+    try {
+        const res = await fetch(`/api/v1/certificados/${encodeURIComponent(certId)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al eliminar certificado');
+        
+        alert('Certificado eliminado exitosamente.');
+        loadCertificados();
+        loadDashboardKPIs();
+    } catch(err) {
+        alert('Error al eliminar certificado: ' + err.message);
+    }
+}
+
 // Hook into initial loads
 const oldIniciarSesionUsuario = iniciarSesionUsuario;
 iniciarSesionUsuario = function(user) {
     oldIniciarSesionUsuario(user);
     checkSMTPStatus();
 };
+
+window.abrirModalEditarTrabajador = abrirModalEditarTrabajador;
+window.closeEditTrabajadorModal = closeEditTrabajadorModal;
+window.handleSaveTrabajadorEdit = handleSaveTrabajadorEdit;
+window.eliminarCertificadoJS = eliminarCertificadoJS;
+
 
 
