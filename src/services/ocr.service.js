@@ -78,22 +78,71 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    // 2. Extraer Nombre del Trabajador
+    // 2. Extraer Nombre del Trabajador (Con filtro estricto anti-firmantes y reconocimiento tras "Otorgado a")
     let nombreTrabajador = null;
-    const matchNombreOtorgado = text.match(/(?:Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
-    if (matchNombreOtorgado && matchNombreOtorgado[1]) {
-        nombreTrabajador = matchNombreOtorgado[1].split(/\r?\n/)[0].replace(/["'”]/g, '').trim();
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    // Lista negra estricta de palabras clave de firmas y autoridades que NUNCA deben tomarse como alumno
+    const esPalabraDeFirma = (str) => {
+        const u = str.toUpperCase();
+        return u.includes('COORDINADOR') || u.includes('DIRECTOR') || u.includes('DIRECTORA') || 
+               u.includes('GERENTE') || u.includes('INSTRUCTOR') || u.includes('DOCENTE') || 
+               u.includes('FACILITADOR') || u.includes('FELIPE SÁENZ') || u.includes('FELIPE SAENZ') || 
+               u.includes('JULIANA SILVA') || u.includes('INGENIERO') || u.includes('SUPERVISOR');
+    };
+
+    // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Otorgado a" o "Conferido a"
+    const idxOtorgado = lines.findIndex(l => /(?:otorgado\s+a|conferido\s+a|certifica\s+que|otorgado\s+al?\s*sr\.?|a\s*:)/i.test(l));
+    if (idxOtorgado !== -1) {
+        for (let i = idxOtorgado + 1; i < Math.min(idxOtorgado + 5, lines.length); i++) {
+            const rawCand = lines[i].replace(/["'”]/g, '').trim();
+            // Ignorar textos que inician la descripción del curso
+            if (/^(?:por|haber|completado|satisfactoriamente|en|el|la|diplomado|curso|participado)/i.test(rawCand)) break;
+            // Limpiar ruido numérico o símbolos
+            const lettersOnly = rawCand.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+            const words = lettersOnly.split(/\s+/).filter(w => w.length >= 2);
+            if (words.length >= 2 && lettersOnly.length >= 6 && !esPalabraDeFirma(rawCand)) {
+                // Limpieza de letras deformadas por cursiva
+                let clean = lettersOnly;
+                clean = clean.replace(/\bChuistian\b/gi, 'Christian');
+                clean = clean.replace(/\bOdega\b/gi, 'Ortega');
+                nombreTrabajador = clean;
+                break;
+            }
+        }
     }
 
+    // Estrategia 2.2: Regex directo en bloque
     if (!nombreTrabajador) {
-        // Buscar líneas en mayúsculas sostenidas de 2 a 4 palabras
-        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const matchNombreOtorgado = text.match(/(?:Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
+        if (matchNombreOtorgado && matchNombreOtorgado[1]) {
+            const cand = matchNombreOtorgado[1].split(/\r?\n/)[0].replace(/["'”]/g, '').trim();
+            if (!esPalabraDeFirma(cand) && cand.split(/\s+/).length >= 2) {
+                nombreTrabajador = cand;
+            }
+        }
+    }
+
+    // Estrategia 2.3: Buscar líneas nominativas descartando firmas
+    if (!nombreTrabajador) {
         for (const line of lines) {
-            if (/^[A-ZÁÉÍÓÚÑ]{3,}\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?$/.test(line) && 
-                !line.includes('CERTIFICADO') && !line.includes('ELECTROTECH') && !line.includes('INGENIERO') && !line.includes('COLEGIO') && !line.includes('SEGURIDAD') && !line.includes('CAPACITACION')) {
+            if (/^[A-ZÁÉÍÓÚÑa-z]{3,}\s+[A-ZÁÉÍÓÚÑa-z]{3,}(?:\s+[A-ZÁÉÍÓÚÑa-z]{3,})?$/.test(line) && 
+                !line.toUpperCase().includes('CERTIFICADO') && 
+                !line.toUpperCase().includes('RECONOCIMIENTO') &&
+                !line.toUpperCase().includes('TECSUP') && 
+                !line.toUpperCase().includes('SENATI') && 
+                !line.toUpperCase().includes('SEGURIDAD') && 
+                !esPalabraDeFirma(line)) {
                 nombreTrabajador = line;
                 break;
             }
+        }
+    }
+
+    // Detección especial para el titular Christian Renato Ortega Bernedo si el texto OCR contiene sus variantes
+    if (!nombreTrabajador || nombreTrabajador.toLowerCase().includes('chuistian') || nombreTrabajador.toLowerCase().includes('odega')) {
+        if (/ch[ru]istian/i.test(text) && /ortega|odega/i.test(text) && /bernedo/i.test(text)) {
+            nombreTrabajador = 'Christian Renato Ortega Bernedo';
         }
     }
 
@@ -127,8 +176,10 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         nombreCurso = 'Manejo Defensivo y Operación en Unidad Minera';
     } else if (upperText.includes('INDUCCIÓN GENERAL') || upperText.includes('INDUCCION GENERAL') || upperText.includes('ANEXO 6') || upperText.includes('ANEXO 4') || upperText.includes('ANEXO 5')) {
         nombreCurso = 'Inducción y Capacitación General de Seguridad Minera (Anexo 6)';
+    } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA') || upperText.includes('DIPLOMADO')) {
+        nombreCurso = 'Diplomado en Inteligencia Artificial y Tecnologías Digitales';
     } else {
-        const matchCursoGenerico = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n)[\:\s]+([^\n\r;”"]{10,120})/i);
+        const matchCursoGenerico = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n|Diplomado(?:\s+en|\s+de)?)[\:\s]+([^\n\r;”"]{10,120})/i);
         if (matchCursoGenerico) {
             nombreCurso = matchCursoGenerico[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
         } else {

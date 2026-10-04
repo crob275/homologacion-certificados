@@ -1624,10 +1624,214 @@ function verInstruccionesSMTP() {
     );
 }
 
+// =========================================================================
+// PORTAL DE CONSULTA DEL TRABAJADOR / KIOSCO DIGITAL DE HABILITACIÓN POR DNI
+// =========================================================================
+let datosKioscoActivo = null;
+
+async function consultarHabilitacionTrabajadorPublico() {
+    const input = document.getElementById('public-search-dni');
+    const dni = input ? input.value.trim() : '';
+
+    if (!dni || dni.length < 6) {
+        return alert('Por favor ingrese un número de DNI o documento válido (mínimo 6 dígitos).');
+    }
+
+    try {
+        const res = await fetch(`/api/v1/trabajadores/consulta-dni/${encodeURIComponent(dni)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+            return alert(data.error || 'No se encontró información para el documento ingresado.');
+        }
+
+        datosKioscoActivo = data;
+        abrirModalKiosco(data);
+    } catch (err) {
+        alert('Error conectando con el servicio de consulta: ' + err.message);
+    }
+}
+
+function abrirModalKiosco(data) {
+    const modal = document.getElementById('modal-kiosco-trabajador');
+    const body = document.getElementById('kiosco-content-body');
+    if (!modal || !body) return;
+
+    const trab = data.trabajador;
+    const certs = data.certificados || [];
+    const esApto = (trab.estado_habilitacion === 'HABILITADO');
+
+    const badgeEstado = esApto
+        ? `<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; padding: 10px 16px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3rem;">🟢</span>
+                <span>ESTADO EN GARITA: HABILITADO (PASE A PLANTA AUTORIZADO)</span>
+            </span>
+            <span style="font-size: 0.8rem; background: #065f46; color: #a7f3d0; padding: 4px 10px; border-radius: 999px;">Conforme D.S. 024-2016-EM</span>
+           </div>`
+        : `<div style="background: rgba(244, 63, 94, 0.15); border: 1px solid #f43f5e; color: #fb7185; padding: 10px 16px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3rem;">🔴</span>
+                <span>ESTADO EN GARITA: INHABILITADO (ACCESO RESTRINGIDO)</span>
+            </span>
+            <span style="font-size: 0.8rem; background: #881337; color: #fecdd3; padding: 4px 10px; border-radius: 999px;">Requiere Regularización</span>
+           </div>`;
+
+    let filasCerts = '';
+    if (certs.length === 0) {
+        filasCerts = `<tr><td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">No se registran certificados homologados a la fecha.</td></tr>`;
+    } else {
+        certs.forEach((c, idx) => {
+            let badgeVig = '';
+            if (c.dias_restantes <= 0) {
+                badgeVig = `<span class="badge badge-danger" style="font-size: 0.75rem;">⛔ VENCIDO</span>`;
+            } else if (c.dias_restantes <= 90) {
+                badgeVig = `<span class="badge badge-warning" style="font-size: 0.75rem;">⚠️ POR VENCER (${c.dias_restantes}d)</span>`;
+            } else {
+                badgeVig = `<span class="badge badge-success" style="font-size: 0.75rem;">✓ VIGENTE (${c.dias_restantes}d)</span>`;
+            }
+
+            filasCerts += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <td style="padding: 10px; font-size: 0.8rem; color: var(--text-secondary);">${idx + 1}</td>
+                    <td style="padding: 10px;">
+                        <strong style="color: #fff; font-size: 0.88rem;">${c.nombre_curso}</strong><br>
+                        <small style="color: var(--text-secondary);">${c.entidad_emisora} &bull; ${c.horas_lectivas} hrs</small>
+                    </td>
+                    <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">
+                        ${formatFechaUI(c.fecha_emision)}
+                    </td>
+                    <td style="padding: 10px; font-size: 0.82rem; font-weight: 600; color: #fff; font-family: monospace;">
+                        ${formatFechaUI(c.fecha_vencimiento)}
+                    </td>
+                    <td style="padding: 10px; text-align: center;">
+                        ${badgeVig}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    body.innerHTML = `
+        <div style="margin-bottom: 1.25rem;">
+            ${badgeEstado}
+        </div>
+
+        <!-- Ficha de Datos del Personal -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 1.25rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                <div>
+                    <small style="color: var(--text-secondary); display: block; font-size: 0.75rem;">Trabajador Titular</small>
+                    <strong style="font-size: 1rem; color: #fff;">${trab.nombres} ${trab.apellidos}</strong>
+                    <div style="color: var(--accent-cyan); font-family: monospace; font-size: 0.82rem;">${trab.tipo_documento}: ${trab.numero_documento}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); display: block; font-size: 0.75rem;">Empresa Contratista</small>
+                    <strong style="color: #fff; font-size: 0.9rem;">${trab.empresa_nombre}</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">RUC: ${trab.empresa_ruc || 'N/A'}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); display: block; font-size: 0.75rem;">Cargo & Ubicación</small>
+                    <strong style="color: var(--accent-amber); font-size: 0.9rem;">${trab.cargo_puesto || 'Técnico Especialista'}</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">Área: ${trab.area_trabajo || 'Planta / Mina'}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); display: block; font-size: 0.75rem;">Correo Registrado para Avisos</small>
+                    <code style="color: var(--accent-cyan); font-size: 0.82rem;">${trab.email_personal || 'No registrado'}</code>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">Celular: ${trab.telefono_personal || 'No registrado'}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Certificados y Vigencias -->
+        <div style="margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong style="color: #fff; font-size: 0.9rem;">Certificados y Homologaciones Normativas (${certs.length})</strong>
+                <small style="color: var(--text-secondary);">Renovación anual exigida por D.S. 024-2016-EM</small>
+            </div>
+            <div style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: rgba(255,255,255,0.04); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
+                            <th style="padding: 10px;">#</th>
+                            <th style="padding: 10px;">Curso / Entidad</th>
+                            <th style="padding: 10px;">Emisión</th>
+                            <th style="padding: 10px;">Vencimiento</th>
+                            <th style="padding: 10px; text-align: center;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filasCerts}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Barra de Acciones de Auto-Servicio para el Empleado -->
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-cyan);"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    ¿No te llegó el correo de notificación o necesitas reenviarlo?
+                </strong>
+                <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-secondary);">
+                    Puedes despachar tu ficha oficial a tu bandeja en este mismo instante.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn-primary" onclick="reenviarFichaKioscoCorreo()" style="font-size: 0.82rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    <span>Reenviar a mi Correo</span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+}
+
+function closeKioscoModal() {
+    const modal = document.getElementById('modal-kiosco-trabajador');
+    if (modal) modal.style.display = 'none';
+}
+
+async function reenviarFichaKioscoCorreo() {
+    if (!datosKioscoActivo || !datosKioscoActivo.trabajador) return;
+
+    const trab = datosKioscoActivo.trabajador;
+    const correoActual = trab.email_personal || '';
+    const emailDestino = prompt('Confirme o ingrese el correo electrónico donde desea recibir su ficha oficial:', correoActual);
+
+    if (!emailDestino || !emailDestino.includes('@')) {
+        return alert('Por favor ingrese un correo válido.');
+    }
+
+    try {
+        const res = await fetch('/api/v1/trabajadores/reenviar-notificacion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                trabajador_id: trab.id,
+                email_nuevo: emailDestino.trim()
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error enviando correo.');
+
+        alert(`¡Ficha despachada con éxito!\n\nSe envió a: ${emailDestino}.\nPor favor revise su bandeja de entrada.`);
+        trab.email_personal = emailDestino.trim();
+        abrirModalKiosco(datosKioscoActivo);
+    } catch (err) {
+        alert('Error en reenvío de notificación: ' + err.message);
+    }
+}
+
 // Hook into initial loads
 const oldIniciarSesionUsuario = iniciarSesionUsuario;
 iniciarSesionUsuario = function(user) {
     oldIniciarSesionUsuario(user);
     checkSMTPStatus();
 };
+
 

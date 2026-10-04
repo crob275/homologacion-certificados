@@ -43,12 +43,17 @@ async function uploadPDFOCR(req, res) {
         const pdfBuffer = req.file ? fs.readFileSync(req.file.path) : Buffer.from('');
 
         const extracted = await extraerMetadatosRealPDF(pdfBuffer, req.file ? req.file.originalname : filename);
-        const empresaSeleccionadaId = req.body.empresa_id || 'emp-1';
+        const empresaSeleccionadaId = req.body.empresa_id || 'emp-3';
 
-        // Buscar trabajador en BD por coincidencia precisa de nombres/apellidos
-        const nombrePDFLimpio = extracted.nombreTrabajador.trim().toLowerCase();
+        // 1. Buscar coincidencia por DNI si se extrajo
         let trabajador = null;
-        if (nombrePDFLimpio.length > 3 && !nombrePDFLimpio.includes('no identificado')) {
+        if (extracted.dniTrabajador && extracted.dniTrabajador.length === 8) {
+            trabajador = await getDB('SELECT * FROM trabajadores WHERE numero_documento = ? LIMIT 1', [extracted.dniTrabajador]);
+        }
+
+        // 2. Buscar por coincidencia de Nombres/Apellidos en tabla trabajadores
+        const nombrePDFLimpio = extracted.nombreTrabajador.trim().toLowerCase();
+        if (!trabajador && nombrePDFLimpio.length > 4 && !nombrePDFLimpio.includes('trabajador acreditado')) {
             trabajador = await getDB(
                 `SELECT * FROM trabajadores 
                  WHERE LOWER(CONCAT(nombres, ' ', apellidos)) = ? 
@@ -59,29 +64,52 @@ async function uploadPDFOCR(req, res) {
             );
         }
 
+        // 3. Si no existe en trabajadores pero es un Usuario del Sistema (ej. Christian Renato Ortega Bernedo)
+        let usuarioSistemaMatch = null;
+        if (!trabajador) {
+            usuarioSistemaMatch = await getDB(
+                `SELECT * FROM usuarios 
+                 WHERE LOWER(nombre_completo) = ? 
+                    OR (LENGTH(?) > 8 AND LOWER(nombre_completo) LIKE ?)
+                 LIMIT 1`,
+                [nombrePDFLimpio, nombrePDFLimpio, `%${nombrePDFLimpio}%`]
+            );
+        }
+
         let esNuevoTrabajador = false;
         let discrepanciaDetectada = false;
         let mensajeDiscrepancia = null;
 
         if (!trabajador) {
             const nuevoId = 'tr-' + Date.now();
-            const nuevoDoc = String(Math.floor(Math.random() * 89999999 + 10000000));
-            const nombreLimpio = extracted.nombreTrabajador.trim();
-            const partes = nombreLimpio.split(/\s+/);
+            const nuevoDoc = extracted.dniTrabajador || String(Math.floor(Math.random() * 89999999 + 10000000));
             let nombres = '';
             let apellidos = '';
-            if (partes.length <= 2) {
-                nombres = partes[0];
-                apellidos = partes[1] || '';
-            } else {
+            let emailPersonal = '';
+
+            if (usuarioSistemaMatch) {
+                // Adoptar datos oficiales del usuario
+                const partes = usuarioSistemaMatch.nombre_completo.trim().split(/\s+/);
                 nombres = partes.slice(0, 2).join(' ');
-                apellidos = partes.slice(2).join(' ');
+                apellidos = partes.slice(2).join(' ') || partes[1] || '';
+                emailPersonal = usuarioSistemaMatch.email;
+            } else {
+                const nombreLimpio = extracted.nombreTrabajador.trim();
+                const partes = nombreLimpio.split(/\s+/);
+                if (partes.length <= 2) {
+                    nombres = partes[0] || 'Operario';
+                    apellidos = partes[1] || 'General';
+                } else {
+                    nombres = partes.slice(0, 2).join(' ');
+                    apellidos = partes.slice(2).join(' ');
+                }
+                emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
             }
 
             await runDB(`
                 INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, estado_habilitacion)
                 VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, 'Técnico Especialista en Mantenimiento', 'INHABILITADO')
-            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`, '+51 987654321']);
+            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, emailPersonal, '+51 987654321']);
 
             trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
             esNuevoTrabajador = true;
@@ -90,14 +118,14 @@ async function uploadPDFOCR(req, res) {
             const nombreBD = `${trabajador.nombres} ${trabajador.apellidos}`.toLowerCase();
             if (!nombreBD.includes(nombrePDFLimpio) && !nombrePDFLimpio.includes(nombreBD)) {
                 discrepanciaDetectada = true;
-                mensajeDiscrepancia = `⚠️ ADVERTENCIA DE DISCREPANCIA: El nombre extraído del PDF ("${extracted.nombreTrabajador}") difiere de la ficha en BD ("${trabajador.nombres} ${trabajador.apellidos}" - DNI: ${trabajador.numero_documento}). Se requiere auditoría por Supervisor HSE.`;
+                mensajeDiscrepancia = `Aviso de Verificación: El nombre del PDF ("${extracted.nombreTrabajador}") difiere de la ficha en BD ("${trabajador.nombres} ${trabajador.apellidos}" - DNI: ${trabajador.numero_documento}).`;
             }
         }
 
         const empresa = await getDB('SELECT * FROM empresas WHERE id = ?', [empresaSeleccionadaId]) || await getDB('SELECT * FROM empresas WHERE id = ?', [trabajador.empresa_id]) || await getDB('SELECT * FROM empresas ORDER BY created_at ASC LIMIT 1');
         const fechaVencimiento = calcularFechaVencimiento(extracted.fechaEmision);
 
-        // Prevenir duplicidad de certificados: verificar si ya existe para este trabajador el mismo curso o emisión
+        // Prevenir duplicidad de certificados
         let certExistente = await getDB(
             'SELECT * FROM certificados WHERE trabajador_id = ? AND (LOWER(nombre_curso) = LOWER(?) OR pdf_filename = ?)',
             [trabajador.id, extracted.nombreCurso, filename]
@@ -130,17 +158,32 @@ async function uploadPDFOCR(req, res) {
         await recalcularEstadoTrabajadorBD(trabajador.id);
         const certificadoCreado = await getDB('SELECT * FROM certificados WHERE id = ?', [newCertId]);
 
+        // Disparar de inmediato la notificación oficial al correo del trabajador
+        let envioEmailResultado = null;
+        try {
+            envioEmailResultado = await enviarNotificacionIndividualTrabajador({
+                certificadoId: newCertId,
+                remitenteNombre: 'Centro de Acreditación Digital Minera',
+                remitenteRol: 'AUDITORÍA HSE',
+                remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
+            });
+        } catch (mailErr) {
+            console.warn('⚠️ No se pudo despachar el correo inmediato de PDF:', mailErr.message);
+        }
+
         res.status(201).json({
             exito: true,
             es_nuevo_trabajador: esNuevoTrabajador,
             es_actualizacion: Boolean(certExistente),
             discrepancia_detectada: discrepanciaDetectada,
             mensaje_discrepancia: mensajeDiscrepancia,
+            correo_enviado: Boolean(envioEmailResultado),
+            destinatario_correo: trabajador.email_personal,
             message: esNuevoTrabajador 
-                ? `¡NUEVO TRABAJADOR REGISTRADO EN BD! Se creó la ficha para "${trabajador.nombres} ${trabajador.apellidos}".`
+                ? `¡NUEVO TRABAJADOR REGISTRADO EN BD! Se creó la ficha para "${trabajador.nombres} ${trabajador.apellidos}" y se despachó el correo a ${trabajador.email_personal}.`
                 : (certExistente 
-                    ? `Certificado de "${trabajador.nombres} ${trabajador.apellidos}" actualizado con nueva vigencia.` 
-                    : (discrepanciaDetectada ? mensajeDiscrepancia : `Certificado para "${trabajador.nombres} ${trabajador.apellidos}" registrado correctamente.`)),
+                    ? `Certificado de "${trabajador.nombres} ${trabajador.apellidos}" actualizado y notificado a ${trabajador.email_personal}.` 
+                    : (discrepanciaDetectada ? mensajeDiscrepancia : `Certificado para "${trabajador.nombres} ${trabajador.apellidos}" registrado y notificado exitosamente.`)),
             datos_vinculados_bd: {
                 trabajador_id: trabajador.id,
                 trabajador_nombres: `${trabajador.nombres} ${trabajador.apellidos}`,
@@ -198,7 +241,7 @@ async function uploadBatchPDFOCR(req, res) {
                     trabajador = await getDB('SELECT * FROM trabajadores WHERE numero_documento = ? LIMIT 1', [extracted.dniTrabajador]);
                 }
 
-                if (!trabajador && extracted.nombreTrabajador && extracted.nombreTrabajador.length > 4 && !extracted.nombreTrabajador.includes('No Identificado')) {
+                if (!trabajador && extracted.nombreTrabajador && extracted.nombreTrabajador.length > 4 && !extracted.nombreTrabajador.includes('Trabajador Acreditado')) {
                     const nombreLimpio = extracted.nombreTrabajador.trim().toLowerCase();
                     trabajador = await getDB(
                         `SELECT * FROM trabajadores 
@@ -210,18 +253,43 @@ async function uploadBatchPDFOCR(req, res) {
                     );
                 }
 
+                // Si no existe como trabajador pero coincide con un usuario del sistema (ej. Christian Renato Ortega Bernedo)
+                let usuarioMatch = null;
+                if (!trabajador && extracted.nombreTrabajador) {
+                    const nLimp = extracted.nombreTrabajador.trim().toLowerCase();
+                    usuarioMatch = await getDB(
+                        `SELECT * FROM usuarios 
+                         WHERE LOWER(nombre_completo) = ? 
+                            OR (LENGTH(?) > 8 AND LOWER(nombre_completo) LIKE ?)
+                         LIMIT 1`,
+                        [nLimp, nLimp, `%${nLimp}%`]
+                    );
+                }
+
                 let esNuevoTrabajador = false;
                 if (!trabajador) {
                     const nuevoId = 'tr-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
                     const docFinal = extracted.dniTrabajador || String(Math.floor(Math.random() * 89999999 + 10000000));
-                    const partes = extracted.nombreTrabajador.trim().split(/\s+/);
-                    let nombres = partes[0] || 'Operario';
-                    let apellidos = partes.slice(1).join(' ') || 'General';
+                    let nombres = '';
+                    let apellidos = '';
+                    let emailPersonal = '';
+
+                    if (usuarioMatch) {
+                        const partes = usuarioMatch.nombre_completo.trim().split(/\s+/);
+                        nombres = partes.slice(0, 2).join(' ');
+                        apellidos = partes.slice(2).join(' ') || partes[1] || '';
+                        emailPersonal = usuarioMatch.email;
+                    } else {
+                        const partes = extracted.nombreTrabajador.trim().split(/\s+/);
+                        nombres = partes[0] || 'Operario';
+                        apellidos = partes.slice(1).join(' ') || 'General';
+                        emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
+                    }
 
                     await runDB(`
                         INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, estado_habilitacion)
                         VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, 'Técnico Especialista en Mantenimiento', 'INHABILITADO')
-                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`, '+51 987654321']);
+                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, emailPersonal, '+51 987654321']);
 
                     trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
                     esNuevoTrabajador = true;
@@ -263,10 +331,26 @@ async function uploadBatchPDFOCR(req, res) {
 
                 await recalcularEstadoTrabajadorBD(trabajador.id);
 
+                // Enviar notificación oficial a cada trabajador procesado en el lote
+                let correoEnviado = false;
+                try {
+                    await enviarNotificacionIndividualTrabajador({
+                        certificadoId: certId,
+                        remitenteNombre: 'Centro de Acreditación Digital Minera',
+                        remitenteRol: 'AUDITORÍA HSE',
+                        remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
+                    });
+                    correoEnviado = true;
+                } catch (batchMailErr) {
+                    console.warn(`⚠️ Error enviando correo a ${trabajador.email_personal}:`, batchMailErr.message);
+                }
+
                 resultados.push({
                     archivo_original: file.originalname,
                     trabajador_nombre: `${trabajador.nombres} ${trabajador.apellidos}`,
                     trabajador_dni: trabajador.numero_documento,
+                    trabajador_email: trabajador.email_personal,
+                    correo_notificado: correoEnviado,
                     curso_reconocido: extracted.nombreCurso,
                     entidad_emisora: extracted.entidad,
                     horas: extracted.horas,
