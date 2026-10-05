@@ -877,6 +877,7 @@ async function actualizarCertificado(req, res) {
 
 module.exports = {
     listarCertificados,
+    servirArchivoPDF,
     uploadPDFOCR,
     uploadBatchPDFOCR,
     cargarMasivaExcel,
