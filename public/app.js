@@ -1223,6 +1223,12 @@ async function loadCertificados() {
                     <td>${badgeVigencia}</td>
                     <td>
                         <div class="table-btn-group">
+                            ${c.pdf_filename ? `
+                            <button class="table-btn-action" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || c.curso || 'Certificado').replace(/'/g, "\\'")}', '${(c.trabajador_nombre || '').replace(/'/g, "\\'")}')" title="Ver Certificado PDF Original">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <span>PDF</span>
+                            </button>
+                            ` : ''}
                             <button class="table-btn-action table-btn-edit" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" title="Editar Información del Empleado">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 <span>Editar</span>
@@ -1414,9 +1420,19 @@ async function consultarPaseGaritaDNI() {
                 ? (dRest > 0 ? `<span class="badge badge-success">✓ Aprobado (${dRest}d restantes)</span>` : `<span class="badge badge-danger">⛔ Vencido</span>`)
                 : `<span class="badge badge-warning">⏳ Auditando (${c.estado_validacion})</span>`;
 
-            return `<div style="background: #1e293b; padding: 0.5rem 0.75rem; border-radius: 6px; margin-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                <span>📜 <strong>${c.nombre_curso}</strong> (${formatFechaUI(c.fecha_vencimiento)})</span>
-                ${badgeC}
+            return `<div style="background: #1e293b; padding: 0.5rem 0.75rem; border-radius: 6px; margin-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                    <span>📜</span>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>${c.nombre_curso}</strong> (${formatFechaUI(c.fecha_vencimiento)})</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    ${badgeC}
+                    ${c.pdf_filename ? `
+                    <button class="table-btn-action" style="padding: 3px 7px; font-size: 0.72rem; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(primerCert.trabajador_nombre || '').replace(/'/g, "\\'")}')" title="Ver Certificado PDF Original">
+                        📄 PDF
+                    </button>
+                    ` : ''}
+                </div>
             </div>`;
         }).join('');
 
@@ -1732,6 +1748,13 @@ function abrirModalKiosco(data) {
                     <td style="padding: 10px; text-align: center;">
                         ${badgeVig}
                     </td>
+                    <td style="padding: 10px; text-align: center;">
+                        ${c.pdf_filename ? `
+                            <button class="table-btn-action" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Certificado PDF Oficial">
+                                📄 <span>Ver PDF</span>
+                            </button>
+                        ` : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Sin archivo</span>`}
+                    </td>
                 </tr>
             `;
         });
@@ -1783,6 +1806,7 @@ function abrirModalKiosco(data) {
                             <th style="padding: 10px;">Emisión</th>
                             <th style="padding: 10px;">Vencimiento</th>
                             <th style="padding: 10px; text-align: center;">Estado</th>
+                            <th style="padding: 10px; text-align: center;">Documento</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1947,10 +1971,42 @@ iniciarSesionUsuario = function(user) {
     checkSMTPStatus();
 };
 
+// Funciones de Visualización de Certificado PDF
+function abrirVisorPDF(nombreArchivo, tituloCurso, trabajadorNombre) {
+    if (!nombreArchivo) {
+        alert('Este certificado no tiene un archivo PDF adjunto en el sistema.');
+        return;
+    }
+    const modal = document.getElementById('modal-visor-pdf');
+    const iframe = document.getElementById('pdf-viewer-frame');
+    const titleEl = document.getElementById('pdf-viewer-title');
+    const subTitleEl = document.getElementById('pdf-viewer-subtitle');
+    const btnExt = document.getElementById('btn-pdf-external');
+
+    const fileUrl = `/uploads/${encodeURIComponent(nombreArchivo)}`;
+
+    if (titleEl) titleEl.textContent = tituloCurso ? `📄 ${tituloCurso}` : '📄 Certificado Oficial';
+    if (subTitleEl) subTitleEl.textContent = trabajadorNombre ? `Titular: ${trabajadorNombre} • Archivo: ${nombreArchivo}` : `Archivo: ${nombreArchivo}`;
+    if (btnExt) btnExt.href = fileUrl;
+    if (iframe) iframe.src = fileUrl;
+
+    if (modal) modal.style.display = 'flex';
+}
+
+function cerrarVisorPDF() {
+    const modal = document.getElementById('modal-visor-pdf');
+    const iframe = document.getElementById('pdf-viewer-frame');
+    if (iframe) iframe.src = '';
+    if (modal) modal.style.display = 'none';
+}
+
+window.abrirVisorPDF = abrirVisorPDF;
+window.cerrarVisorPDF = cerrarVisorPDF;
 window.abrirModalEditarTrabajador = abrirModalEditarTrabajador;
 window.closeEditTrabajadorModal = closeEditTrabajadorModal;
 window.handleSaveTrabajadorEdit = handleSaveTrabajadorEdit;
 window.eliminarCertificadoJS = eliminarCertificadoJS;
+
 
 
 
