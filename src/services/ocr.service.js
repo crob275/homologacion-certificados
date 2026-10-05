@@ -8,9 +8,11 @@ async function extractTextFromPDF(pdfBuffer) {
     // 1. Try vector text first
     try {
         if (pdfBuffer && pdfBuffer.length > 0) {
-            const PDFParse = pdfParseModule.PDFParse || pdfParseModule;
-            if (typeof PDFParse === 'function') {
-                const instance = new PDFParse({ data: pdfBuffer });
+            if (typeof pdfParseModule === 'function') {
+                const res = await pdfParseModule(pdfBuffer);
+                text = (res && res.text) ? res.text.replace(/-- \d+ of \d+ --/g, '').trim() : '';
+            } else if (pdfParseModule.PDFParse && typeof pdfParseModule.PDFParse === 'function') {
+                const instance = new pdfParseModule.PDFParse({ data: pdfBuffer });
                 const res = await instance.getText();
                 text = (res && res.text) ? res.text.replace(/-- \d+ of \d+ --/g, '').trim() : '';
             }
