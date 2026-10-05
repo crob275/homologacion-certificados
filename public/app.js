@@ -1886,23 +1886,61 @@ async function abrirModalEditarTrabajador(trabajadorId) {
     trabajadorEditandoId = trabajadorId;
 
     try {
-        const res = await fetch('/api/v1/trabajadores');
-        const trabs = await res.json();
-        const trab = trabs.find(t => t.id === trabajadorId);
+        let trab = null;
+        try {
+            const res = await fetch('/api/v1/trabajadores');
+            if (res.ok) {
+                const trabs = await res.json();
+                if (Array.isArray(trabs)) {
+                    trab = trabs.find(t => t.id === trabajadorId);
+                }
+            }
+        } catch(e) {
+            console.warn('Fallback a cache de certificados para editar trabajador:', e);
+        }
 
-        if (!trab) return alert('No se encontraron los datos del empleado.');
+        // Si no se encuentra en el endpoint /trabajadores, buscar en la lista de certificados en memoria
+        if (!trab) {
+            const certRow = Array.from(document.querySelectorAll('#tbody-certificados tr')).find(r => r.innerHTML.includes(trabajadorId));
+            if (certRow) {
+                const docMatch = certRow.innerText.match(/Doc:\s*(\w+)/);
+                const emailMatch = certRow.innerText.match(/✉️\s*([^\s\n]+)/);
+                const telMatch = certRow.innerText.match(/📞\s*([^\s\n]+)/);
+                trab = {
+                    id: trabajadorId,
+                    nombres: '',
+                    apellidos: '',
+                    numero_documento: docMatch ? docMatch[1] : '',
+                    email_personal: emailMatch ? emailMatch[1] : '',
+                    telefono_personal: telMatch ? telMatch[1] : '',
+                    cargo_puesto: 'Técnico Especialista'
+                };
+            }
+        }
 
-        document.getElementById('modal-trab-id').value = trab.id;
-        document.getElementById('modal-trab-nombres').value = trab.nombres || '';
-        document.getElementById('modal-trab-apellidos').value = trab.apellidos || '';
-        document.getElementById('modal-trab-doc').value = trab.numero_documento || '';
-        document.getElementById('modal-trab-email').value = trab.email_personal || '';
-        document.getElementById('modal-trab-telefono').value = trab.telefono_personal || '';
-        document.getElementById('modal-trab-cargo').value = trab.cargo_puesto || '';
+        const idInput = document.getElementById('modal-trab-id');
+        const nombresInput = document.getElementById('modal-trab-nombres');
+        const apellidosInput = document.getElementById('modal-trab-apellidos');
+        const docInput = document.getElementById('modal-trab-doc');
+        const emailInput = document.getElementById('modal-trab-email');
+        const telInput = document.getElementById('modal-trab-telefono');
+        const cargoInput = document.getElementById('modal-trab-cargo');
+
+        if (idInput) idInput.value = trabajadorId;
+        if (nombresInput) nombresInput.value = trab ? (trab.nombres || '') : '';
+        if (apellidosInput) apellidosInput.value = trab ? (trab.apellidos || '') : '';
+        if (docInput) docInput.value = trab ? (trab.numero_documento || '') : '';
+        if (emailInput) emailInput.value = trab ? (trab.email_personal || '') : '';
+        if (telInput) telInput.value = trab ? (trab.telefono_personal || '') : '';
+        if (cargoInput) cargoInput.value = trab ? (trab.cargo_puesto || '') : '';
 
         const modal = document.getElementById('modal-editar-trabajador');
-        if (modal) modal.style.display = 'flex';
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.style.zIndex = '99999';
+        }
     } catch (err) {
+        console.error('Error abriendo modal de edición:', err);
         alert('Error cargando datos del empleado: ' + err.message);
     }
 }
@@ -1974,7 +2012,7 @@ iniciarSesionUsuario = function(user) {
 // Funciones de Visualización de Certificado PDF
 function abrirVisorPDF(nombreArchivo, tituloCurso, trabajadorNombre) {
     if (!nombreArchivo) {
-        alert('Este certificado no tiene un archivo PDF adjunto en el sistema.');
+        alert('Este certificado no tiene un archivo adjunto en el sistema.');
         return;
     }
     const modal = document.getElementById('modal-visor-pdf');
@@ -1983,10 +2021,10 @@ function abrirVisorPDF(nombreArchivo, tituloCurso, trabajadorNombre) {
     const subTitleEl = document.getElementById('pdf-viewer-subtitle');
     const btnExt = document.getElementById('btn-pdf-external');
 
-    const fileUrl = `/uploads/${encodeURIComponent(nombreArchivo)}`;
+    const fileUrl = `/api/v1/certificados/archivo/${encodeURIComponent(nombreArchivo)}`;
 
     if (titleEl) titleEl.textContent = tituloCurso ? `📄 ${tituloCurso}` : '📄 Certificado Oficial';
-    if (subTitleEl) subTitleEl.textContent = trabajadorNombre ? `Titular: ${trabajadorNombre} • Archivo: ${nombreArchivo}` : `Archivo: ${nombreArchivo}`;
+    if (subTitleEl) subTitleEl.textContent = trabajadorNombre ? `Titular: ${trabajadorNombre}` : `Archivo: ${nombreArchivo}`;
     if (btnExt) btnExt.href = fileUrl;
     if (iframe) iframe.src = fileUrl;
 

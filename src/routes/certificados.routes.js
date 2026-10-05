@@ -4,6 +4,7 @@ const upload = require('../middleware/upload.middleware');
 const certificadosController = require('../controllers/certificados.controller');
 
 router.get('/', certificadosController.listarCertificados);
+router.get('/archivo/:filename', certificadosController.servirArchivoPDF);
 router.post('/upload', upload.single('pdfFile'), certificadosController.uploadPDFOCR);
 router.post('/upload-batch', upload.array('pdfFiles', 50), certificadosController.uploadBatchPDFOCR);
 router.post('/carga-masiva-excel', upload.single('excelFile'), certificadosController.cargarMasivaExcel);
