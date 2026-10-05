@@ -181,6 +181,8 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         nombreCurso = 'Manejo Defensivo y Operación en Unidad Minera';
     } else if (upperText.includes('INDUCCIÓN GENERAL') || upperText.includes('INDUCCION GENERAL') || upperText.includes('ANEXO 6') || upperText.includes('ANEXO 4') || upperText.includes('ANEXO 5')) {
         nombreCurso = 'Inducción y Capacitación General de Seguridad Minera (Anexo 6)';
+    } else if (upperText.includes('DESARROLLO CON IA') || upperText.includes('INICIACIÓN AL DESARROLLO CON IA') || upperText.includes('INICIACION AL DESARROLLO CON IA')) {
+        nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
     } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA') || upperText.includes('DIPLOMADO')) {
         nombreCurso = 'Diplomado en Inteligencia Artificial y Tecnologías Digitales';
     } else {
@@ -194,7 +196,9 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // 4. Extraer Entidad Emisora
     let entidad = 'Centro de Capacitación y Homologación Especializado';
-    if (upperText.includes('ELECTROTECH')) {
+    if (upperText.includes('MOUREDEV') || upperText.includes('BIG SCHOOL')) {
+        entidad = 'MoureDev & BIG School';
+    } else if (upperText.includes('ELECTROTECH')) {
         entidad = 'ELECTROTECH - Instituto de Capacitaciones Profesionales';
     } else if (upperText.includes('TECSUP')) {
         entidad = 'TECSUP del Perú';

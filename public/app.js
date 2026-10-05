@@ -859,8 +859,13 @@ async function handleCertificateUpload(e) {
                         <div style="color: var(--text-secondary); font-size: 0.8rem;">Emisión: ${meta.fecha_emision}</div>
                     </div>
                 </div>
-                <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary);">
-                    Empresa: <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc}) &bull; Notificación: <code>${bd.trabajador_email_personal}</code>
+                <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        Empresa: <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc}) &bull; Notificación: <code>${bd.trabajador_email_personal}</code>
+                    </div>
+                    <button type="button" class="btn-primary" style="font-size: 0.78rem; padding: 4px 12px; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;" onclick="abrirModalEditarTrabajador('${bd.trabajador_id}')">
+                        ✏️ Regularizar / Editar Ficha de ${bd.trabajador_nombres}
+                    </button>
                 </div>
             `;
             if (badgeCount) badgeCount.style.display = 'none';
