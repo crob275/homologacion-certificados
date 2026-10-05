@@ -131,6 +131,12 @@ async function uploadPDFOCR(req, res) {
             [trabajador.id, extracted.nombreCurso, filename]
         );
 
+        // Almacenar respaldo en Base64 en la base de datos (url_pdf_storage) para que sobreviva a reinicios en la nube (Railway)
+        let pdfBase64 = null;
+        if (pdfBuffer && pdfBuffer.length > 0 && pdfBuffer.length < 8 * 1024 * 1024) {
+            pdfBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
+        }
+
         let newCertId;
         if (certExistente) {
             newCertId = certExistente.id;
@@ -143,16 +149,17 @@ async function uploadPDFOCR(req, res) {
                     fecha_emision = ?,
                     fecha_vencimiento = ?,
                     pdf_filename = ?,
+                    url_pdf_storage = COALESCE(?, url_pdf_storage),
                     estado_validacion = 'EN_VALIDACION',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, filename, newCertId]);
+            `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, filename, pdfBase64, newCertId]);
         } else {
             newCertId = 'cert-' + Date.now();
             await runDB(`
-                INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, estado_validacion, estado_vigencia)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
-            `, [newCertId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_PDF_' + Math.floor(Math.random() * 899999 + 100000), filename]);
+                INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, url_pdf_storage, estado_validacion, estado_vigencia)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
+            `, [newCertId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_PDF_' + Math.floor(Math.random() * 899999 + 100000), filename, pdfBase64]);
         }
 
         await recalcularEstadoTrabajadorBD(trabajador.id);
@@ -303,6 +310,11 @@ async function uploadBatchPDFOCR(req, res) {
                     [trabajador.id, extracted.nombreCurso, file.filename]
                 );
 
+                let batchBase64 = null;
+                if (pdfBuffer && pdfBuffer.length > 0 && pdfBuffer.length < 8 * 1024 * 1024) {
+                    batchBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
+                }
+
                 let certId;
                 if (certExistente) {
                     certId = certExistente.id;
@@ -315,17 +327,18 @@ async function uploadBatchPDFOCR(req, res) {
                             fecha_emision = ?,
                             fecha_vencimiento = ?,
                             pdf_filename = ?,
+                            url_pdf_storage = COALESCE(?, url_pdf_storage),
                             estado_validacion = 'EN_VALIDACION',
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, file.filename, certId]);
+                    `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, file.filename, batchBase64, certId]);
                     actualizados++;
                 } else {
                     certId = 'cert-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
                     await runDB(`
-                        INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, estado_validacion, estado_vigencia)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
-                    `, [certId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_BATCH_' + Math.floor(Math.random() * 899999 + 100000), file.filename]);
+                        INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, url_pdf_storage, estado_validacion, estado_vigencia)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
+                    `, [certId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_BATCH_' + Math.floor(Math.random() * 899999 + 100000), file.filename, batchBase64]);
                     creados++;
                 }
 
@@ -755,9 +768,16 @@ async function servirArchivoPDF(req, res) {
             return res.sendFile(filePath);
         }
 
-        // Si el archivo físico no está en el disco de Railway (ej. cargado en sesión anterior), 
-        // buscar datos del certificado en BD y renderizar un visor oficial digital de contingencia
+        // 2. Buscar si el PDF binario real está persistido en la BD (url_pdf_storage)
         const cert = await getDB('SELECT c.*, CONCAT(t.nombres, " ", t.apellidos) as trab_nombre, t.numero_documento as trab_doc, e.razon_social as emp_nombre FROM certificados c JOIN trabajadores t ON c.trabajador_id = t.id JOIN empresas e ON c.empresa_id = e.id WHERE c.pdf_filename = ? OR c.id = ? LIMIT 1', [safeFilename, safeFilename]);
+
+        if (cert && cert.url_pdf_storage && cert.url_pdf_storage.startsWith('data:application/pdf;base64,')) {
+            const base64Data = cert.url_pdf_storage.replace('data:application/pdf;base64,', '');
+            const fileBuffer = Buffer.from(base64Data, 'base64');
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+            return res.send(fileBuffer);
+        }
 
         const certTitulo = cert ? cert.nombre_curso : 'Certificado de Homologación Minera';
         const titular = cert ? `${cert.trab_nombre} (DNI: ${cert.trab_doc})` : 'Trabajador Acreditado';
