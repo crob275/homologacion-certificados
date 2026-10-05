@@ -264,6 +264,7 @@ function aplicarPrivilegiosRol(rol) {
     const btnEditEmp = document.getElementById('btn-edit-active-company');
     const tabSupervisorBtn = document.getElementById('tab-btn-supervisor');
     const tabUsuariosBtn = document.getElementById('tab-btn-usuarios');
+    const tabSolicitudesBtn = document.getElementById('tab-btn-solicitudes');
     const tabPowerBIBtn = document.getElementById('tab-btn-powerbi');
     const scopeBar = document.getElementById('superadmin-scope-bar');
 
@@ -279,26 +280,31 @@ function aplicarPrivilegiosRol(rol) {
         if (btnEditEmp) btnEditEmp.style.display = 'inline-block';
         if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'inline-block';
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block';
+        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'inline-block';
     } else if (rol === 'SUPERVISOR') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
         if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'inline-block';
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none';
+        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
     } else if (rol === 'CONTRATISTA') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
         if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'none';
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block'; // Admin de empresa administra usuarios de su contratista
+        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'none';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
     } else if (rol === 'OPERADOR') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
         if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'none';
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none'; // OPERADOR DE CARGA NO TIENE ACCESO A USUARIOS & ROLES
+        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'none';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
     }
+    actualizarBadgeSolicitudesPendientes();
 }
 
 // ==============================================================================
@@ -618,6 +624,7 @@ function switchTab(tabId) {
         loadCertificados();
     }
     if (tabId === 'supervisor') loadAuditoriaList();
+    if (tabId === 'solicitudes') loadSolicitudesCorreccion();
     if (tabId === 'cron') loadAlertasLog();
     if (tabId === 'powerbi') loadPowerBIPreview();
 }
@@ -901,7 +908,18 @@ async function handleCertificateUpload(e) {
                         </tr>
                     `;
                 } else {
-                    const tagNuevo = item.es_nuevo_trabajador 
+                    const trabNombre = item.trabajador_nombre || (item.trabajador ? item.trabajador.nombres : 'Trabajador');
+                    const trabDni = item.trabajador_dni || (item.trabajador ? item.trabajador.documento : 'S/D');
+                    const trabId = item.trabajador_id || (item.trabajador ? item.trabajador.id : '');
+                    const certCurso = item.curso_reconocido || (item.certificado ? item.certificado.curso : 'Curso Normativo');
+                    const certHoras = item.horas || (item.certificado ? item.certificado.horas : '16');
+                    const certEntidad = item.entidad_emisora || (item.certificado ? item.certificado.entidad : 'Certificadora');
+                    const certEmision = item.fecha_emision || (item.certificado ? item.certificado.fecha_emision : '-');
+                    const certVenc = item.fecha_vencimiento || (item.certificado ? item.certificado.fecha_vencimiento : '-');
+                    const pdfFile = item.pdf_filename || '';
+
+                    const esNuevo = item.estado === 'NUEVO_TRABAJADOR' || item.es_nuevo_trabajador;
+                    const tagNuevo = esNuevo
                         ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">Nuevo</span>`
                         : `<span class="badge badge-info" style="font-size: 0.7rem; padding: 2px 6px;">Existente</span>`;
                     
@@ -909,19 +927,30 @@ async function handleCertificateUpload(e) {
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
                             <td style="padding: 6px 10px; color: var(--text-secondary); font-size: 0.8rem;">${idx + 1}</td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #fff;">
-                                ${item.trabajador.nombres}<br>
-                                <small style="color: var(--accent-cyan); font-family: monospace;">DNI: ${item.trabajador.documento}</small> ${tagNuevo}
+                                ${trabNombre}<br>
+                                <small style="color: var(--accent-cyan); font-family: monospace;">DNI: ${trabDni}</small> ${tagNuevo}
                             </td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; color: var(--accent-amber);">
-                                <strong>${item.certificado.curso}</strong><br>
-                                <small style="color: var(--text-secondary);">${item.certificado.horas}h &bull; ${item.certificado.entidad}</small>
+                                <strong>${certCurso}</strong><br>
+                                <small style="color: var(--text-secondary);">${certHoras}h &bull; ${certEntidad}</small>
                             </td>
                             <td style="padding: 6px 10px; font-size: 0.8rem; color: var(--text-secondary);">
-                                Emisión: ${item.certificado.fecha_emision}<br>
-                                <strong style="color: var(--success);">Vence: ${item.certificado.fecha_vencimiento}</strong>
+                                Emisión: ${certEmision}<br>
+                                <strong style="color: var(--success);">Vence: ${certVenc}</strong>
                             </td>
                             <td style="padding: 6px 10px; font-size: 0.8rem;">
-                                <span class="badge badge-success" style="font-size: 0.72rem;">Registrado en BD</span>
+                                <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+                                    ${pdfFile ? `
+                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="abrirVisorPDF('${pdfFile}', '${certCurso.replace(/'/g, "\\'")}', '${trabNombre.replace(/'/g, "\\'")}')" title="Ver Certificado PDF">
+                                            📄 PDF
+                                        </button>
+                                    ` : ''}
+                                    ${trabId ? `
+                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="abrirModalEditarTrabajador('${trabId}')" title="Editar / Regularizar Ficha">
+                                            ✏️ Editar
+                                        </button>
+                                    ` : ''}
+                                </div>
                             </td>
                         </tr>
                     `;
@@ -956,7 +985,7 @@ async function handleCertificateUpload(e) {
                                 <th style="padding: 8px 10px;">Trabajador / DNI</th>
                                 <th style="padding: 8px 10px;">Curso Minero & Horas</th>
                                 <th style="padding: 8px 10px;">Vigencia Oficial</th>
-                                <th style="padding: 8px 10px;">Estado BD</th>
+                                <th style="padding: 8px 10px;">Acciones & PDF</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1832,7 +1861,10 @@ function abrirModalKiosco(data) {
                     Puedes despachar tu ficha oficial a tu bandeja en este mismo instante.
                 </p>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn-warning" onclick="abrirModalSolicitudDesdeKiosco()" style="font-size: 0.82rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24;">
+                    <span>⚠️ Solicitar Corrección de Datos</span>
+                </button>
                 <button type="button" class="btn-primary" onclick="reenviarFichaKioscoCorreo()" style="font-size: 0.82rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     <span>Reenviar a mi Correo</span>
@@ -2049,6 +2081,229 @@ window.abrirModalEditarTrabajador = abrirModalEditarTrabajador;
 window.closeEditTrabajadorModal = closeEditTrabajadorModal;
 window.handleSaveTrabajadorEdit = handleSaveTrabajadorEdit;
 window.eliminarCertificadoJS = eliminarCertificadoJS;
+
+// =========================================================================
+// MÓDULO FRONTEND: SOLICITUDES DE CORRECCIÓN (TRABAJADOR <-> ADMIN)
+// =========================================================================
+
+function abrirModalSolicitudDesdeKiosco() {
+    if (!datosKioscoActivo || !datosKioscoActivo.trabajador) return;
+    const trab = datosKioscoActivo.trabajador;
+
+    document.getElementById('sol-trabajador-id').value = trab.id;
+    document.getElementById('sol-certificado-id').value = '';
+    document.getElementById('sol-trabajador-nombre').value = `${trab.nombres} ${trab.apellidos} (DNI: ${trab.numero_documento})`;
+    document.getElementById('sol-campo-afectado').value = 'numero_documento';
+    document.getElementById('sol-valor-anterior').value = trab.numero_documento || 'Sin DNI';
+    document.getElementById('sol-valor-solicitado').value = '';
+    document.getElementById('sol-motivo').value = '';
+    document.getElementById('sol-contacto').value = trab.email_personal || trab.telefono_personal || '';
+
+    const modal = document.getElementById('modal-solicitar-correccion');
+    if (modal) modal.style.display = 'flex';
+}
+
+function actualizarPlaceholderSolicitud() {
+    if (!datosKioscoActivo || !datosKioscoActivo.trabajador) return;
+    const trab = datosKioscoActivo.trabajador;
+    const campo = document.getElementById('sol-campo-afectado').value;
+
+    let anterior = '';
+    if (campo === 'numero_documento') anterior = trab.numero_documento;
+    else if (campo === 'nombres') anterior = trab.nombres;
+    else if (campo === 'apellidos') anterior = trab.apellidos;
+    else if (campo === 'email_personal') anterior = trab.email_personal;
+    else if (campo === 'telefono_personal') anterior = trab.telefono_personal;
+    else if (campo === 'cargo_puesto') anterior = trab.cargo_puesto;
+
+    document.getElementById('sol-valor-anterior').value = anterior || 'No registrado';
+}
+
+function cerrarModalSolicitudCorreccion() {
+    const modal = document.getElementById('modal-solicitar-correccion');
+    if (modal) modal.style.display = 'none';
+}
+
+async function enviarSolicitudCorreccion(e) {
+    e.preventDefault();
+    const trabId = document.getElementById('sol-trabajador-id').value;
+    const certId = document.getElementById('sol-certificado-id').value;
+    const campo = document.getElementById('sol-campo-afectado').value;
+    const anterior = document.getElementById('sol-valor-anterior').value;
+    const solicitado = document.getElementById('sol-valor-solicitado').value.trim();
+    const motivo = document.getElementById('sol-motivo').value.trim();
+    const contacto = document.getElementById('sol-contacto').value.trim();
+
+    if (!solicitado) return alert('Por favor ingrese el nuevo valor requerido.');
+
+    try {
+        const res = await fetch('/api/v1/trabajadores/solicitudes-correccion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                trabajador_id: trabId,
+                certificado_id: certId || null,
+                campo_afectado: campo,
+                valor_anterior: anterior,
+                valor_solicitado: solicitado,
+                motivo_observacion: motivo,
+                solicitante_contacto: contacto
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al enviar solicitud.');
+
+        alert('¡Solicitud registrada exitosamente!\nHa sido puesta en la bandeja del Administrador HSE para validación legal.');
+        cerrarModalSolicitudCorreccion();
+        actualizarBadgeSolicitudesPendientes();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function loadSolicitudesCorreccion() {
+    const tbody = document.getElementById('tbody-solicitudes');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-secondary);">Cargando solicitudes de auditoría...</td></tr>';
+
+    try {
+        const res = await fetch('/api/v1/trabajadores/solicitudes-correccion');
+        if (!res.ok) throw new Error('Error al obtener solicitudes.');
+
+        const lista = await res.json();
+        if (!lista || lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-secondary);">✓ No hay solicitudes de corrección pendientes en este momento.</td></tr>';
+            actualizarBadgeSolicitudesPendientes(0);
+            return;
+        }
+
+        const pendientes = lista.filter(s => s.estado === 'PENDIENTE').length;
+        actualizarBadgeSolicitudesPendientes(pendientes);
+
+        tbody.innerHTML = lista.map(s => {
+            const esPendiente = s.estado === 'PENDIENTE';
+            let badgeEst = '';
+            if (s.estado === 'PENDIENTE') badgeEst = '<span class="badge badge-warning">⏳ Pendiente</span>';
+            else if (s.estado === 'APROBADA') badgeEst = '<span class="badge badge-success">✓ Aprobada</span>';
+            else badgeEst = '<span class="badge badge-danger">✕ Rechazada</span>';
+
+            const nombreCompleto = s.trabajador_nombres ? `${s.trabajador_nombres} ${s.trabajador_apellidos || ''}` : (s.trabajador_nombre || 'Trabajador');
+
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <td style="font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap;">
+                        ${s.fecha_solicitud ? s.fecha_solicitud.substring(0, 16).replace('T', ' ') : '-'}
+                    </td>
+                    <td>
+                        <strong style="color: #fff; font-size: 0.88rem;">${nombreCompleto}</strong><br>
+                        <small style="color: var(--accent-cyan); font-family: monospace;">Doc: ${s.trabajador_doc || 'S/D'}</small>
+                    </td>
+                    <td style="font-size: 0.82rem; color: var(--text-secondary);">
+                        ${s.empresa_nombre || 'Empresa Contratista'}
+                    </td>
+                    <td>
+                        <code style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: var(--accent-amber);">
+                            ${s.campo_afectado}
+                        </code>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">
+                            Antes: ${s.valor_anterior || '<em>Vacío</em>'}
+                        </div>
+                    </td>
+                    <td>
+                        <strong style="color: var(--success); font-size: 0.88rem;">
+                            ${s.valor_solicitado}
+                        </strong>
+                    </td>
+                    <td style="font-size: 0.82rem; color: var(--text-secondary); max-width: 200px;">
+                        ${s.motivo_observacion || '-'}<br>
+                        ${s.solicitante_contacto ? `<small style="color: var(--accent-cyan);">Contacto: ${s.solicitante_contacto}</small>` : ''}
+                    </td>
+                    <td>
+                        ${badgeEst}
+                        ${s.revisado_por ? `<div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px;">Por: ${s.revisado_por}</div>` : ''}
+                    </td>
+                    <td>
+                        ${esPendiente ? `
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white;" onclick="resolverSolicitudJS('${s.id}', 'APROBADA')" title="Aprobar corrección y aplicar cambio">
+                                    ✓ Aprobar
+                                </button>
+                                <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="resolverSolicitudJS('${s.id}', 'RECHAZADA')" title="Rechazar observación">
+                                    ✕ Rechazar
+                                </button>
+                            </div>
+                        ` : `
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">Resuelta</span>
+                        `}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger); text-align:center;">Error: ${err.message}</td></tr>`;
+    }
+}
+
+async function resolverSolicitudJS(solicitudId, accion) {
+    const motivo = prompt(`Ingrese sustento u observación administrativa para ${accion}:`, accion === 'APROBADA' ? 'Conforme con cotejo documental oficial' : 'Datos no coinciden con documento legal');
+    if (motivo === null) return;
+
+    try {
+        const revisor = (usuarioSesionActivo && usuarioSesionActivo.nombre_completo) ? usuarioSesionActivo.nombre_completo : 'Administrador HSE';
+
+        const res = await fetch(`/api/v1/trabajadores/solicitudes-correccion/${encodeURIComponent(solicitudId)}/resolver`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accion: accion,
+                respuesta_admin: motivo,
+                revisor_nombre: revisor
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al procesar resolución.');
+
+        alert(`¡Solicitud ${accion} correctamente! El cambio fue procesado en la base de datos.`);
+        loadSolicitudesCorreccion();
+        loadCertificados();
+        loadDashboardKPIs();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function actualizarBadgeSolicitudesPendientes(conteoDirecto) {
+    const badge = document.getElementById('badge-solicitudes-pendientes');
+    if (!badge) return;
+
+    if (typeof conteoDirecto === 'number') {
+        badge.textContent = conteoDirecto;
+        badge.style.display = conteoDirecto > 0 ? 'inline-block' : 'none';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/trabajadores/solicitudes-correccion');
+        if (res.ok) {
+            const list = await res.json();
+            const pend = Array.isArray(list) ? list.filter(s => s.estado === 'PENDIENTE').length : 0;
+            badge.textContent = pend;
+            badge.style.display = pend > 0 ? 'inline-block' : 'none';
+        }
+    } catch(e) {}
+}
+
+window.abrirModalSolicitudDesdeKiosco = abrirModalSolicitudDesdeKiosco;
+window.actualizarPlaceholderSolicitud = actualizarPlaceholderSolicitud;
+window.cerrarModalSolicitudCorreccion = cerrarModalSolicitudCorreccion;
+window.enviarSolicitudCorreccion = enviarSolicitudCorreccion;
+window.loadSolicitudesCorreccion = loadSolicitudesCorreccion;
+window.resolverSolicitudJS = resolverSolicitudJS;
+window.actualizarBadgeSolicitudesPendientes = actualizarBadgeSolicitudesPendientes;
+
 
 
 

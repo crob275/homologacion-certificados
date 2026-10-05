@@ -225,6 +225,24 @@ async function setupSQLiteSchemaAndSeeds() {
                 )
             `);
 
+            sqliteDb.run(`
+                CREATE TABLE IF NOT EXISTS solicitudes_correccion (
+                    id TEXT PRIMARY KEY,
+                    trabajador_id TEXT NOT NULL,
+                    certificado_id TEXT,
+                    campo_afectado TEXT NOT NULL,
+                    valor_anterior TEXT,
+                    valor_solicitado TEXT NOT NULL,
+                    motivo_observacion TEXT,
+                    solicitante_contacto TEXT,
+                    estado TEXT DEFAULT 'PENDIENTE',
+                    respuesta_admin TEXT,
+                    revisado_por TEXT,
+                    fecha_solicitud DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    fecha_resolucion DATETIME
+                )
+            `);
+
             // Insertar empresas por defecto
             sqliteDb.get('SELECT COUNT(*) as count FROM empresas', (err, row) => {
                 if (row && row.count === 0) {
@@ -376,6 +394,27 @@ async function setupMySQLSchemaAndSeeds() {
                 dias_restantes INT,
                 mensaje_resumen TEXT,
                 fecha_envio DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
+        // 6. Tabla solicitudes_correccion
+        await mysqlPool.query(`
+            CREATE TABLE IF NOT EXISTS solicitudes_correccion (
+                id VARCHAR(36) PRIMARY KEY,
+                trabajador_id VARCHAR(36) NOT NULL,
+                certificado_id VARCHAR(36),
+                campo_afectado VARCHAR(100) NOT NULL,
+                valor_anterior VARCHAR(255),
+                valor_solicitado VARCHAR(255) NOT NULL,
+                motivo_observacion TEXT,
+                solicitante_contacto VARCHAR(150),
+                estado ENUM('PENDIENTE', 'APROBADA', 'RECHAZADA') DEFAULT 'PENDIENTE',
+                respuesta_admin TEXT,
+                revisado_por VARCHAR(100),
+                fecha_solicitud DATETIME DEFAULT CURRENT_TIMESTAMP,
+                fecha_resolucion DATETIME,
+                INDEX idx_sol_trab (trabajador_id),
+                INDEX idx_sol_estado (estado)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
 

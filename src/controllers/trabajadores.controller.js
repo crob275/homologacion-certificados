@@ -189,11 +189,102 @@ async function reenviarNotificacionTrabajador(req, res) {
     }
 }
 
+// =========================================================================
+// MÓDULO NORMATIVO DE SOLICITUDES DE CORRECCIÓN (TRABAJADOR -> ADMIN)
+// =========================================================================
+
+async function crearSolicitudCorreccion(req, res) {
+    try {
+        const { trabajador_id, certificado_id, campo_afectado, valor_anterior, valor_solicitado, motivo_observacion, solicitante_contacto } = req.body;
+
+        if (!trabajador_id || !campo_afectado || !valor_solicitado) {
+            return res.status(400).json({ error: 'Identificador del trabajador, campo a corregir y valor solicitado son obligatorios.' });
+        }
+
+        const idSol = 'sol-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+        await runDB(`
+            INSERT INTO solicitudes_correccion (id, trabajador_id, certificado_id, campo_afectado, valor_anterior, valor_solicitado, motivo_observacion, solicitante_contacto, estado)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE')
+        `, [idSol, trabajador_id, certificado_id || null, campo_afectado, valor_anterior || '', valor_solicitado, motivo_observacion || '', solicitante_contacto || '']);
+
+        res.status(201).json({
+            exito: true,
+            message: 'Solicitud de corrección enviada formalmente. Queda en cola de auditoría para revisión del Administrador.',
+            solicitud_id: idSol
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Error creando solicitud de corrección: ' + err.message });
+    }
+}
+
+async function listarSolicitudesCorreccion(req, res) {
+    try {
+        const solicitudes = await allDB(`
+            SELECT s.*, 
+                   t.nombres as trabajador_nombres,
+                   t.apellidos as trabajador_apellidos,
+                   t.numero_documento as trabajador_doc,
+                   e.razon_social as empresa_nombre
+            FROM solicitudes_correccion s
+            JOIN trabajadores t ON s.trabajador_id = t.id
+            JOIN empresas e ON t.empresa_id = e.id
+            ORDER BY s.fecha_solicitud DESC
+        `);
+        res.json(solicitudes);
+    } catch (err) {
+        res.status(500).json({ error: 'Error listando solicitudes: ' + err.message });
+    }
+}
+
+async function resolverSolicitudCorreccion(req, res) {
+    try {
+        const { id } = req.params;
+        const { accion, respuesta_admin, revisor_nombre } = req.body; // accion: 'APROBADA' o 'RECHAZADA'
+
+        const sol = await getDB('SELECT * FROM solicitudes_correccion WHERE id = ?', [id]);
+        if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada.' });
+
+        const nuevoEstado = (accion === 'APROBADA') ? 'APROBADA' : 'RECHAZADA';
+
+        // Si se aprueba, aplicar automáticamente el cambio en la tabla correspondiente
+        if (nuevoEstado === 'APROBADA') {
+            const campo = sol.campo_afectado.toLowerCase();
+            const valor = sol.valor_solicitado;
+
+            if (['nombres', 'apellidos', 'numero_documento', 'email_personal', 'telefono_personal', 'cargo_puesto'].includes(campo)) {
+                await runDB(`UPDATE trabajadores SET ${campo} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [valor, sol.trabajador_id]);
+            } else if (sol.certificado_id && ['nombre_curso', 'entidad_emisora', 'horas_lectivas', 'fecha_emision'].includes(campo)) {
+                await runDB(`UPDATE certificados SET ${campo} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [valor, sol.certificado_id]);
+            }
+        }
+
+        await runDB(`
+            UPDATE solicitudes_correccion SET
+                estado = ?,
+                respuesta_admin = ?,
+                revisado_por = ?,
+                fecha_resolucion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `, [nuevoEstado, respuesta_admin || '', revisor_nombre || 'Administrador HSE', id]);
+
+        res.json({
+            exito: true,
+            message: `Solicitud ${nuevoEstado} exitosamente.`
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Error resolviendo solicitud: ' + err.message });
+    }
+}
+
 module.exports = {
     listarTrabajadores,
     crearTrabajador,
     actualizarTrabajador,
     eliminarTrabajador,
     consultarPorDNI,
-    reenviarNotificacionTrabajador
+    reenviarNotificacionTrabajador,
+    crearSolicitudCorreccion,
+    listarSolicitudesCorreccion,
+    resolverSolicitudCorreccion
 };

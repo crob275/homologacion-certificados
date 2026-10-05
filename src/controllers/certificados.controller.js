@@ -360,6 +360,7 @@ async function uploadBatchPDFOCR(req, res) {
 
                 resultados.push({
                     archivo_original: file.originalname,
+                    trabajador_id: trabajador.id,
                     trabajador_nombre: `${trabajador.nombres} ${trabajador.apellidos}`,
                     trabajador_dni: trabajador.numero_documento,
                     trabajador_email: trabajador.email_personal,
@@ -369,6 +370,7 @@ async function uploadBatchPDFOCR(req, res) {
                     horas: extracted.horas,
                     fecha_emision: extracted.fechaEmision,
                     fecha_vencimiento: fechaVencimiento,
+                    pdf_filename: file.filename,
                     estado: certExistente ? 'ACTUALIZADO' : (esNuevoTrabajador ? 'NUEVO_TRABAJADOR' : 'REGISTRADO')
                 });
             } catch (fileErr) {
