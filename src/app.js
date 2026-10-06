@@ -72,6 +72,11 @@ app.post('/api/v1/cron/ejecutar-alertas', async (req, res) => {
     }
 });
 
+// Ruta Dedicada para Tótem / Kiosco Digital
+app.get(['/kiosko', '/kiosk'], (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'kiosko.html'));
+});
+
 // Fallback SPA HTML Index
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));

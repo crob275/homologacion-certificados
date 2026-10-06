@@ -94,7 +94,7 @@ async function consultarPorDNI(req, res) {
             return res.status(400).json({ error: 'Número de documento o DNI no válido.' });
         }
 
-        const trabajador = await getDB(`
+        let trabajador = await getDB(`
             SELECT t.*, 
                    e.razon_social AS empresa_nombre, 
                    e.ruc_rut AS empresa_ruc,
@@ -106,9 +106,25 @@ async function consultarPorDNI(req, res) {
             LIMIT 1
         `, [cleanDni]);
 
+        if (!trabajador && cleanDni.length > 3) {
+            const queryNorm = cleanDni.toLowerCase();
+            trabajador = await getDB(`
+                SELECT t.*, 
+                       e.razon_social AS empresa_nombre, 
+                       e.ruc_rut AS empresa_ruc,
+                       e.email_contacto AS empresa_email, 
+                       e.telefono_contacto AS empresa_telefono
+                FROM trabajadores t
+                JOIN empresas e ON t.empresa_id = e.id
+                WHERE LOWER(t.nombres || ' ' || t.apellidos) LIKE ?
+                   OR LOWER(t.apellidos || ' ' || t.nombres) LIKE ?
+                LIMIT 1
+            `, [`%${queryNorm}%`, `%${queryNorm}%`]);
+        }
+
         if (!trabajador) {
             return res.status(404).json({ 
-                error: 'No se encontró ningún trabajador registrado con el DNI: ' + cleanDni,
+                error: 'No se encontró ningún trabajador registrado con el documento o nombre: ' + cleanDni,
                 sugerencia: 'Verifique que su empresa haya cargado su nómina o certificado en la plataforma.'
             });
         }

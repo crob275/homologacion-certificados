@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosco Digital del Trabajador | HomologaControl Minería D.S. 024-2016-EM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background: #090d16;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .kiosko-header {
+            background: rgba(15, 23, 42, 0.85);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .kiosko-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .kiosko-logo-badge {
+            background: linear-gradient(135deg, #38bdf8, #0284c7);
+            color: #0b1120;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+        .kiosko-container {
+            max-width: 900px;
+            width: 95%;
+            margin: 2rem auto;
+            flex: 1;
+        }
+        .kiosko-search-card {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+        .numpad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 320px;
+            margin: 1.5rem auto 0 auto;
+        }
+        .numpad-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 1rem 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .numpad-btn:hover {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: #38bdf8;
+            transform: translateY(-2px);
+        }
+        .numpad-btn:active {
+            transform: translateY(0);
+        }
+        .numpad-btn-action {
+            background: rgba(244, 63, 94, 0.15);
+            border-color: rgba(244, 63, 94, 0.3);
+            color: #f87171;
+        }
+        .status-badge-big {
+            padding: 0.9rem 1.5rem;
+            border-radius: 12px;
+            font-size: 1.15rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Superior del Kiosco -->
+    <header class="kiosko-header">
+        <div class="kiosko-brand">
+            <div class="kiosko-logo-badge">🛡️</div>
+            <div>
+                <h1 style="margin: 0; font-size: 1.15rem; color: #fff; font-weight: 700;">Tótem de Autoservicio / Kiosco Digital</h1>
+                <small style="color: var(--accent-cyan); font-size: 0.78rem;">Consulta de Acreditación Normativa D.S. 024-2016-EM & Ley 29783</small>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="/" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem 1rem; text-decoration: none; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                🏢 Portal Administrativo
+            </a>
+        </div>
+    </header>
+
+    <div class="kiosko-container">
+
+        <!-- PANTALLA 1: BÚSQUEDA Y TECLADO VIRTUAL DE TOQUE RÁPIDO -->
+        <div id="kiosko-search-section" class="kiosko-search-card">
+            <div style="display: inline-block; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; padding: 0.35rem 0.9rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.8rem;">
+                ⚡ Consulta en Línea de Pases a Mina & Planta
+            </div>
+            <h2 style="margin: 0.3rem 0; font-size: 1.7rem; color: #fff;">Ingrese su Número de DNI</h2>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; max-width: 500px; margin: 0 auto 1.5rem auto;">
+                Digite su documento de identidad para verificar el estado de su pase de garita, consultar sus certificados o reportar observaciones.
+            </p>
+
+            <div style="display: flex; max-width: 460px; margin: 0 auto; gap: 8px;">
+                <input type="text" id="kiosko-input-dni" class="form-control" placeholder="DNI (8 dígitos)" maxlength="12" style="font-size: 1.3rem; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: 2px; padding: 0.75rem;" autofocus onkeyup="if(event.key==='Enter') ejecutarConsultaKiosko()">
+                <button type="button" class="btn-primary" onclick="ejecutarConsultaKiosko()" style="padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 700; white-space: nowrap; background: linear-gradient(135deg, #0284c7, #0369a1);">
+                    🔍 Consultar
+                </button>
+            </div>
+
+            <!-- Teclado en Pantalla para Tótems Táctiles -->
+            <div class="numpad-grid">
+                <button type="button" class="numpad-btn" onclick="teclearNumero('1')">1</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('2')">2</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('3')">3</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('4')">4</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('5')">5</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('6')">6</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('7')">7</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('8')">8</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('9')">9</button>
+                <button type="button" class="numpad-btn numpad-btn-action" onclick="borrarUltimoDigito()">⌫</button>
+                <button type="button" class="numpad-btn" onclick="teclearNumero('0')">0</button>
+                <button type="button" class="numpad-btn" style="background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #34d399;" onclick="ejecutarConsultaKiosko()">↵</button>
+            </div>
+        </div>
+
+        <!-- PANTALLA 2: RESULTADO DE HABILITACIÓN DEL OPERARIO -->
+        <div id="kiosko-result-section" style="display: none; margin-top: 1.5rem;">
+            <!-- Contenido dinámico del trabajador -->
+            <div id="kiosko-result-content"></div>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE SOLICITUD DE CORRECCIÓN (TRABAJADOR -> ADMIN) -->
+    <div id="modal-solicitar-correccion" class="modal-overlay" style="display: none; z-index: 99999;">
+        <div class="modal-card" style="max-width: 580px;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; color: #fff;">
+                    <span style="color: var(--accent-amber); font-size: 1.2rem;">⚠️</span>
+                    Solicitud Formal de Corrección de Datos
+                </h3>
+                <button onclick="cerrarModalSolicitudKiosko()" class="btn-close-modal">✕</button>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0.75rem 0 1rem 0; line-height: 1.5;">
+                Conforme al protocolo de auditoría minera, cualquier modificación en la ficha del personal (DNI, Nombres, Certificados) debe ser validada y aprobada por el <strong>Administrador HSE</strong> para garantizar la trazabilidad legal.
+            </p>
+            <form id="formSolicitudKiosko" onsubmit="enviarSolicitudDesdeKiosko(event)">
+                <input type="hidden" id="kiosko-sol-trabajador-id">
+                <input type="hidden" id="kiosko-sol-certificado-id">
+
+                <div class="form-group" style="margin-bottom: 0.9rem;">
+                    <label>Trabajador Afectado:</label>
+                    <input type="text" id="kiosko-sol-trabajador-nombre" class="form-control" readonly style="opacity: 0.8; background: rgba(255,255,255,0.03);">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0.9rem;">
+                    <label>Dato o Campo a Rectificar *</label>
+                    <select id="kiosko-sol-campo" class="form-control" required onchange="actualizarPlaceholderKiosko()">
+                        <option value="numero_documento">Número de Documento / DNI</option>
+                        <option value="nombres">Nombres del Trabajador</option>
+                        <option value="apellidos">Apellidos del Trabajador</option>
+                        <option value="email_personal">Correo Electrónico Personal</option>
+                        <option value="telefono_personal">Teléfono / Celular</option>
+                        <option value="cargo_puesto">Cargo / Especialidad</option>
+                        <option value="nombre_curso">Nombre del Curso del Certificado</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0.9rem;">
+                    <label>Valor o Dato Actual Registrado:</label>
+                    <input type="text" id="kiosko-sol-valor-anterior" class="form-control" readonly style="opacity: 0.8; background: rgba(255,255,255,0.03);">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0.9rem;">
+                    <label>Nuevo Valor Correcto Solicitado *</label>
+                    <input type="text" id="kiosko-sol-valor-nuevo" class="form-control" required placeholder="Ingrese el dato correcto verificado">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0.9rem;">
+                    <label>Motivo o Sustento de la Observación *</label>
+                    <textarea id="kiosko-sol-motivo" class="form-control" rows="2" required placeholder="Ej: En el certificado subido no aparecía mi DNI impreso / Error tipográfico en apellidos"></textarea>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label>Correo o Teléfono de Contacto para Confirmación (Opcional):</label>
+                    <input type="text" id="kiosko-sol-contacto" class="form-control" placeholder="Ej: 987654321 / correo@empresa.com">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn-primary" onclick="cerrarModalSolicitudKiosko()" style="background: rgba(255,255,255,0.08); color: var(--text-primary); box-shadow: none;">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">📤 Enviar Solicitud a Auditoría</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL VISOR DE CERTIFICADOS PDF -->
+    <div id="modal-visor-pdf" class="modal-overlay" style="display: none; z-index: 99999;">
+        <div class="modal-card" style="max-width: 950px; width: 95%; height: 90vh; display: flex; flex-direction: column; padding: 1.25rem;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(239, 68, 68, 0.15); width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 1.2rem;">
+                        📄
+                    </div>
+                    <div>
+                        <h3 id="pdf-viewer-title" style="margin: 0; font-size: 1.05rem; color: #fff;">Visualizador Oficial de Certificado PDF</h3>
+                        <small id="pdf-viewer-subtitle" style="color: var(--text-secondary); font-size: 0.78rem;">Auditoría documental y cotejo de autenticidad</small>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <a id="btn-pdf-external" href="#" target="_blank" class="btn-primary" style="font-size: 0.78rem; padding: 0.4rem 0.8rem; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+                        ↗️ Abrir en Pestaña Nueva
+                    </a>
+                    <button onclick="cerrarVisorPDF()" class="btn-close-modal" style="font-size: 1.2rem; cursor: pointer;">✕</button>
+                </div>
+            </div>
+            <div style="flex: 1; background: #0b1120; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); position: relative;">
+                <iframe id="pdf-viewer-frame" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let datosTrabajadorActual = null;
+
+        function teclearNumero(num) {
+            const inp = document.getElementById('kiosko-input-dni');
+            if (inp.value.length < 12) inp.value += num;
+        }
+
+        function borrarUltimoDigito() {
+            const inp = document.getElementById('kiosko-input-dni');
+            inp.value = inp.value.slice(0, -1);
+        }
+
+        async function ejecutarConsultaKiosko() {
+            const input = document.getElementById('kiosko-input-dni');
+            const query = input ? input.value.trim() : '';
+            if (!query || query.length < 4) {
+                return alert('Por favor ingrese al menos 4 dígitos de su DNI o documento.');
+            }
+
+            try {
+                const res = await fetch(`/api/v1/trabajadores/consulta-dni/${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    return alert(data.error || 'No se encontró registro para el documento ingresado.');
+                }
+
+                datosTrabajadorActual = data;
+                renderizarResultadoKiosko(data);
+            } catch (err) {
+                alert('Error al conectar con la base de datos: ' + err.message);
+            }
+        }
+
+        function renderizarResultadoKiosko(data) {
+            const trab = data.trabajador;
+            const certs = data.certificados || [];
+            const resultBox = document.getElementById('kiosko-result-content');
+            const searchSec = document.getElementById('kiosko-search-section');
+            const resultSec = document.getElementById('kiosko-result-section');
+
+            const esHabilitado = trab.estado_habilitacion === 'HABILITADO';
+            const esProximo = trab.estado_habilitacion === 'PROXIMO_A_VENCER';
+
+            let badgeHtml = '';
+            if (esHabilitado) {
+                badgeHtml = `
+                    <div class="status-badge-big" style="background: rgba(16, 185, 129, 0.2); border: 2px solid #10b981; color: #34d399;">
+                        <div>
+                            <span>✅ PASE HABILITADO - ACCESO AUTORIZADO A PLANTA</span><br>
+                            <small style="font-size: 0.8rem; font-weight: normal; color: #a7f3d0;">Cumple con los estándares de capacitación minera D.S. 024-2016-EM</small>
+                        </div>
+                        <span class="badge badge-success" style="font-size: 0.85rem; padding: 6px 12px;">APTO</span>
+                    </div>
+                `;
+            } else if (esProximo) {
+                badgeHtml = `
+                    <div class="status-badge-big" style="background: rgba(245, 158, 11, 0.2); border: 2px solid #f59e0b; color: #fbbf24;">
+                        <div>
+                            <span>⚠️ PASE POR VENCER (ALERTA PREVENTIVA &le; 90 DÍAS)</span><br>
+                            <small style="font-size: 0.8rem; font-weight: normal; color: #fde68a;">Coordinar recertificación obligatoria antes de la fecha límite</small>
+                        </div>
+                        <span class="badge badge-warning" style="font-size: 0.85rem; padding: 6px 12px;">POR VENCER</span>
+                    </div>
+                `;
+            } else {
+                badgeHtml = `
+                    <div class="status-badge-big" style="background: rgba(239, 68, 68, 0.2); border: 2px solid #ef4444; color: #f87171;">
+                        <div>
+                            <span>⛔ ACCESO NO AUTORIZADO - INHABILITADO EN GARITA</span><br>
+                            <small style="font-size: 0.8rem; font-weight: normal; color: #fca5a5;">Certificados pendientes de aprobación, vencidos o inexistentes</small>
+                        </div>
+                        <span class="badge badge-danger" style="font-size: 0.85rem; padding: 6px 12px;">INHABILITADO</span>
+                    </div>
+                `;
+            }
+
+            let filasCerts = '';
+            certs.forEach((c, idx) => {
+                let badgeVig = '';
+                if (c.dias_restantes <= 0) badgeVig = `<span class="badge badge-danger">⛔ VENCIDO</span>`;
+                else if (c.dias_restantes <= 90) badgeVig = `<span class="badge badge-warning">⚠️ ${c.dias_restantes}d</span>`;
+                else badgeVig = `<span class="badge badge-success">✓ VIGENTE (${c.dias_restantes}d)</span>`;
+
+                filasCerts += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        <td style="padding: 10px; color: var(--text-secondary);">${idx + 1}</td>
+                        <td style="padding: 10px;">
+                            <strong style="color: #fff; font-size: 0.9rem;">${c.nombre_curso}</strong><br>
+                            <small style="color: var(--text-secondary);">${c.entidad_emisora} &bull; ${c.horas_lectivas} hrs</small>
+                        </td>
+                        <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">${c.fecha_emision}</td>
+                        <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${c.fecha_vencimiento}</td>
+                        <td style="padding: 10px; text-align: center;">${badgeVig}</td>
+                        <td style="padding: 10px; text-align: center;">
+                            ${c.pdf_filename ? `
+                                <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${c.nombre_curso.replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')">
+                                    📄 Ver PDF
+                                </button>
+                            ` : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Sin archivo</span>`}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            resultBox.innerHTML = `
+                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.75rem;">
+                    ${badgeHtml}
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; background: rgba(255,255,255,0.02); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 1.5rem;">
+                        <div>
+                            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Trabajador Titular</small>
+                            <strong style="color: #fff; font-size: 1.05rem;">${trab.nombres} ${trab.apellidos}</strong>
+                            <div style="color: var(--accent-cyan); font-family: monospace; font-size: 0.85rem;">${trab.tipo_documento}: ${trab.numero_documento}</div>
+                        </div>
+                        <div>
+                            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Empresa Contratista</small>
+                            <strong style="color: #fff; font-size: 0.95rem;">${trab.empresa_nombre}</strong>
+                            <div style="color: var(--text-secondary); font-size: 0.8rem;">RUC: ${trab.empresa_ruc || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Cargo Asignado</small>
+                            <strong style="color: var(--accent-amber); font-size: 0.95rem;">${trab.cargo_puesto || 'Técnico Especialista'}</strong>
+                            <div style="color: var(--text-secondary); font-size: 0.8rem;">Área: ${trab.area_trabajo || 'Planta / Mina'}</div>
+                        </div>
+                        <div>
+                            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Correo de Avisos</small>
+                            <code style="color: var(--accent-cyan); font-size: 0.85rem;">${trab.email_personal || 'No registrado'}</code>
+                            <div style="color: var(--text-secondary); font-size: 0.8rem;">Celular: ${trab.telefono_personal || 'No registrado'}</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="color: #fff; font-size: 0.95rem; margin-bottom: 0.6rem;">Expediente de Certificados y Homologaciones (${certs.length})</h3>
+                        <div style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                                <thead>
+                                    <tr style="background: rgba(255,255,255,0.04); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
+                                        <th style="padding: 10px;">#</th>
+                                        <th style="padding: 10px;">Curso / Capacitación</th>
+                                        <th style="padding: 10px;">Emisión</th>
+                                        <th style="padding: 10px;">Vencimiento</th>
+                                        <th style="padding: 10px; text-align: center;">Estado</th>
+                                        <th style="padding: 10px; text-align: center;">Documento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${filasCerts || '<tr><td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">No se encontraron certificados registrados para este personal.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción del Operario -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); padding: 14px; border-radius: 10px;">
+                        <div>
+                            <strong style="color: #fff; font-size: 0.9rem;">¿Detectaste algún dato incorrecto o falta tu DNI en el certificado?</strong>
+                            <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-secondary);">Envía una solicitud formal de corrección para que el Administrador HSE lo regularice.</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn-warning" onclick="abrirModalSolicitudKiosko()" style="font-size: 0.85rem; padding: 0.6rem 1.2rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 700; border: none; border-radius: 8px; cursor: pointer;">
+                                ⚠️ Solicitar Corrección de Datos
+                            </button>
+                            <button type="button" class="btn-primary" onclick="volverABusquedaKiosko()" style="font-size: 0.85rem; padding: 0.6rem 1.2rem; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; cursor: pointer;">
+                                🔄 Nueva Consulta
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            searchSec.style.display = 'none';
+            resultSec.style.display = 'block';
+        }
+
+        function volverABusquedaKiosko() {
+            document.getElementById('kiosko-input-dni').value = '';
+            document.getElementById('kiosko-search-section').style.display = 'block';
+            document.getElementById('kiosko-result-section').style.display = 'none';
+        }
+
+        function abrirModalSolicitudKiosko() {
+            if (!datosTrabajadorActual || !datosTrabajadorActual.trabajador) return;
+            const trab = datosTrabajadorActual.trabajador;
+
+            document.getElementById('kiosko-sol-trabajador-id').value = trab.id;
+            document.getElementById('kiosko-sol-trabajador-nombre').value = `${trab.nombres} ${trab.apellidos} (DNI: ${trab.numero_documento})`;
+            document.getElementById('kiosko-sol-campo').value = 'numero_documento';
+            document.getElementById('kiosko-sol-valor-anterior').value = trab.numero_documento || 'Sin DNI';
+            document.getElementById('kiosko-sol-valor-nuevo').value = '';
+            document.getElementById('kiosko-sol-motivo').value = '';
+            document.getElementById('kiosko-sol-contacto').value = trab.email_personal || trab.telefono_personal || '';
+
+            document.getElementById('modal-solicitar-correccion').style.display = 'flex';
+        }
+
+        function actualizarPlaceholderKiosko() {
+            if (!datosTrabajadorActual || !datosTrabajadorActual.trabajador) return;
+            const trab = datosTrabajadorActual.trabajador;
+            const campo = document.getElementById('kiosko-sol-campo').value;
+
+            let anterior = '';
+            if (campo === 'numero_documento') anterior = trab.numero_documento;
+            else if (campo === 'nombres') anterior = trab.nombres;
+            else if (campo === 'apellidos') anterior = trab.apellidos;
+            else if (campo === 'email_personal') anterior = trab.email_personal;
+            else if (campo === 'telefono_personal') anterior = trab.telefono_personal;
+            else if (campo === 'cargo_puesto') anterior = trab.cargo_puesto;
+
+            document.getElementById('kiosko-sol-valor-anterior').value = anterior || 'No registrado';
+        }
+
+        function cerrarModalSolicitudKiosko() {
+            document.getElementById('modal-solicitar-correccion').style.display = 'none';
+        }
+
+        async function enviarSolicitudDesdeKiosko(e) {
+            e.preventDefault();
+            const trabId = document.getElementById('kiosko-sol-trabajador-id').value;
+            const campo = document.getElementById('kiosko-sol-campo').value;
+            const anterior = document.getElementById('kiosko-sol-valor-anterior').value;
+            const nuevo = document.getElementById('kiosko-sol-valor-nuevo').value.trim();
+            const motivo = document.getElementById('kiosko-sol-motivo').value.trim();
+            const contacto = document.getElementById('kiosko-sol-contacto').value.trim();
+
+            if (!nuevo) return alert('Por favor ingrese el nuevo valor solicitado.');
+
+            try {
+                const res = await fetch('/api/v1/trabajadores/solicitudes-correccion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trabajador_id: trabId,
+                        campo_afectado: campo,
+                        valor_anterior: anterior,
+                        valor_solicitado: nuevo,
+                        motivo_observacion: motivo,
+                        solicitante_contacto: contacto
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Error al enviar solicitud.');
+
+                alert('¡Solicitud enviada exitosamente!\nHa sido enviada a la cola de auditoría del Administrador HSE para validación legal.');
+                cerrarModalSolicitudKiosko();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function abrirVisorPDF(nombreArchivo, tituloCurso, trabajadorNombre) {
+            const modal = document.getElementById('modal-visor-pdf');
+            const iframe = document.getElementById('pdf-viewer-frame');
+            const titleEl = document.getElementById('pdf-viewer-title');
+            const subTitleEl = document.getElementById('pdf-viewer-subtitle');
+            const btnExt = document.getElementById('btn-pdf-external');
+
+            const fileUrl = `/api/v1/certificados/archivo/${encodeURIComponent(nombreArchivo)}`;
+
+            if (titleEl) titleEl.textContent = tituloCurso ? `📄 ${tituloCurso}` : '📄 Certificado Oficial';
+            if (subTitleEl) subTitleEl.textContent = trabajadorNombre ? `Titular: ${trabajadorNombre}` : `Archivo: ${nombreArchivo}`;
+            if (btnExt) btnExt.href = fileUrl;
+            if (iframe) iframe.src = fileUrl;
+
+            modal.style.display = 'flex';
+        }
+
+        function cerrarVisorPDF() {
+            const modal = document.getElementById('modal-visor-pdf');
+            const iframe = document.getElementById('pdf-viewer-frame');
+            if (iframe) iframe.src = '';
+            modal.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

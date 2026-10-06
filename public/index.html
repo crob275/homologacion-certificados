@@ -150,6 +150,10 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
                             <span>Dashboard BI Minero</span>
                         </button>
+                        <button class="tab-btn" id="tab-btn-kiosko" onclick="switchTab('kiosko')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                            <span>Kiosco Digital D.S. 024</span>
+                        </button>
                         <button class="tab-btn" id="tab-btn-contratista" onclick="switchTab('contratista')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                             <span>Carga de Cuadrillas & OCR</span>
@@ -304,6 +308,41 @@
                 <div class="card-title">Distribución del Estado Operativo de Cuadrillas en Unidad Minera</div>
                 <div style="max-height: 320px; display: flex; justify-content: center;">
                     <canvas id="chartStatus"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB KIOSCO DIGITAL D.S. 024-2016-EM (AUTOSERVICIO DEL OPERARIO) -->
+        <div id="tab-kiosko" class="tab-content">
+            <div class="glass-card" style="max-width: 950px; margin: 0 auto;">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <span style="font-size: 1.2rem; color: #fff;">📱 Tótem / Kiosco de Autoservicio del Personal</span>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px;">
+                            Consulta en línea de habilitación minera, certificados y buzón de correcciones.
+                        </div>
+                    </div>
+                    <a href="/kiosko" target="_blank" class="btn-primary" style="font-size: 0.82rem; padding: 0.45rem 0.9rem; text-decoration: none; display: flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;">
+                        ↗️ Abrir Kiosco en Pantalla Completa
+                    </a>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.6); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); margin: 1.25rem 0; text-align: center;">
+                    <div style="max-width: 480px; margin: 0 auto;">
+                        <label style="display: block; font-size: 0.9rem; margin-bottom: 0.6rem; color: var(--text-secondary);">
+                            Ingrese DNI o Nombres del Trabajador:
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="input-kiosko-tab-dni" class="form-control" placeholder="Ej: 70352752 o apellidos..." style="font-size: 1.1rem; text-align: center; font-weight: 700; padding: 0.65rem;" onkeyup="if(event.key==='Enter') consultarKioskoDesdeTab()">
+                            <button type="button" class="btn-primary" onclick="consultarKioskoDesdeTab()" style="padding: 0.65rem 1.25rem; font-weight: 700;">
+                                🔍 Consultar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="kiosko-tab-result-container" style="display: none;">
+                    <!-- Rendered worker details and certificates -->
                 </div>
             </div>
         </div>

@@ -294,7 +294,7 @@ function aplicarPrivilegiosRol(rol) {
         if (btnEditEmp) btnEditEmp.style.display = 'none';
         if (tabSupervisorBtn) tabSupervisorBtn.style.display = 'none';
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block'; // Admin de empresa administra usuarios de su contratista
-        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'none';
+        if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block'; // Admin de empresa también gestiona solicitudes de su personal
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
     } else if (rol === 'OPERADOR') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
@@ -620,6 +620,7 @@ function switchTab(tabId) {
     document.getElementById(`tab-${tabId}`).classList.add('active');
 
     if (tabId === 'dashboard') loadDashboardKPIs();
+    if (tabId === 'kiosko') initTabKiosko();
     if (tabId === 'contratista') {
         loadCertificados();
     }
@@ -2303,6 +2304,190 @@ window.enviarSolicitudCorreccion = enviarSolicitudCorreccion;
 window.loadSolicitudesCorreccion = loadSolicitudesCorreccion;
 window.resolverSolicitudJS = resolverSolicitudJS;
 window.actualizarBadgeSolicitudesPendientes = actualizarBadgeSolicitudesPendientes;
+
+// =========================================================================
+// MÓDULO TAB KIOSCO INTEGRADO EN PANEL PRINCIPAL
+// =========================================================================
+
+function initTabKiosko() {
+    const input = document.getElementById('input-kiosko-tab-dni');
+    if (input) {
+        input.focus();
+        if (!input.value && usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA') {
+            // Sugerir búsqueda
+            input.placeholder = "Ingrese DNI o Nombres del trabajador a auditar...";
+        }
+    }
+}
+
+async function consultarKioskoDesdeTab() {
+    const input = document.getElementById('input-kiosko-tab-dni');
+    const query = input ? input.value.trim() : '';
+    const container = document.getElementById('kiosko-tab-result-container');
+
+    if (!query || query.length < 3) {
+        return alert('Por favor ingrese al menos 3 caracteres (DNI o nombre del trabajador).');
+    }
+
+    try {
+        const res = await fetch(`/api/v1/trabajadores/consulta-dni/${encodeURIComponent(query)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+            return alert(data.error || 'No se encontró ningún trabajador con el dato ingresado.');
+        }
+
+        datosKioscoActivo = data;
+        renderizarKioskoEnTab(data);
+    } catch (err) {
+        alert('Error consultando servidor: ' + err.message);
+    }
+}
+
+function renderizarKioskoEnTab(data) {
+    const container = document.getElementById('kiosko-tab-result-container');
+    if (!container) return;
+
+    const trab = data.trabajador;
+    const certs = data.certificados || [];
+
+    const esHabilitado = trab.estado_habilitacion === 'HABILITADO';
+    const esProximo = trab.estado_habilitacion === 'PROXIMO_A_VENCER';
+
+    let badgeHtml = '';
+    if (esHabilitado) {
+        badgeHtml = `
+            <div style="background: rgba(16, 185, 129, 0.15); border: 1.5px solid #10b981; color: #34d399; padding: 1rem 1.25rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <span style="font-size: 1.05rem; font-weight: 800;">✅ PASE HABILITADO - ACCESO PERMITIDO A PLANTA</span><br>
+                    <small style="color: #a7f3d0; font-size: 0.8rem;">Cumplimiento verificado bajo normativa minera D.S. 024-2016-EM</small>
+                </div>
+                <span class="badge badge-success" style="font-size: 0.82rem; padding: 6px 12px;">APTO</span>
+            </div>
+        `;
+    } else if (esProximo) {
+        badgeHtml = `
+            <div style="background: rgba(245, 158, 11, 0.15); border: 1.5px solid #f59e0b; color: #fbbf24; padding: 1rem 1.25rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <span style="font-size: 1.05rem; font-weight: 800;">⚠️ ALERTA PREVENTIVA - PASE POR VENCER (&le; 90 DÍAS)</span><br>
+                    <small style="color: #fde68a; font-size: 0.8rem;">Coordinar recertificación obligatoria con la contratista</small>
+                </div>
+                <span class="badge badge-warning" style="font-size: 0.82rem; padding: 6px 12px;">POR VENCER</span>
+            </div>
+        `;
+    } else {
+        badgeHtml = `
+            <div style="background: rgba(239, 68, 68, 0.15); border: 1.5px solid #ef4444; color: #f87171; padding: 1rem 1.25rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <span style="font-size: 1.05rem; font-weight: 800;">⛔ ACCESO RESTRINGIDO - INHABILITADO EN GARITA</span><br>
+                    <small style="color: #fca5a5; font-size: 0.8rem;">Certificados vencidos, observados o no homologados en el sistema</small>
+                </div>
+                <span class="badge badge-danger" style="font-size: 0.82rem; padding: 6px 12px;">NO APTO</span>
+            </div>
+        `;
+    }
+
+    let filasCerts = '';
+    certs.forEach((c, idx) => {
+        let badgeVig = '';
+        if (c.dias_restantes <= 0) badgeVig = `<span class="badge badge-danger">⛔ VENCIDO</span>`;
+        else if (c.dias_restantes <= 90) badgeVig = `<span class="badge badge-warning">⚠️ ${c.dias_restantes}d</span>`;
+        else badgeVig = `<span class="badge badge-success">✓ VIGENTE (${c.dias_restantes}d)</span>`;
+
+        filasCerts += `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px; color: var(--text-secondary);">${idx + 1}</td>
+                <td style="padding: 10px;">
+                    <strong style="color: #fff; font-size: 0.88rem;">${c.nombre_curso}</strong><br>
+                    <small style="color: var(--text-secondary);">${c.entidad_emisora} &bull; ${c.horas_lectivas} hrs</small>
+                </td>
+                <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">${c.fecha_emision}</td>
+                <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${c.fecha_vencimiento}</td>
+                <td style="padding: 10px; text-align: center;">${badgeVig}</td>
+                <td style="padding: 10px; text-align: center;">
+                    ${c.pdf_filename ? `
+                        <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')">
+                            📄 Ver PDF
+                        </button>
+                    ` : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Sin archivo</span>`}
+                </td>
+            </tr>
+        `;
+    });
+
+    container.innerHTML = `
+        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;">
+            ${badgeHtml}
+
+            <!-- Ficha del Trabajador -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; background: rgba(255,255,255,0.02); padding: 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 1.25rem;">
+                <div>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Trabajador Titular</small>
+                    <strong style="color: #fff; font-size: 1rem;">${trab.nombres} ${trab.apellidos}</strong>
+                    <div style="color: var(--accent-cyan); font-family: monospace; font-size: 0.82rem;">${trab.tipo_documento}: ${trab.numero_documento}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Empresa Contratista</small>
+                    <strong style="color: #fff; font-size: 0.9rem;">${trab.empresa_nombre}</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">RUC: ${trab.empresa_ruc || 'N/A'}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Cargo Asignado</small>
+                    <strong style="color: var(--accent-amber); font-size: 0.9rem;">${trab.cargo_puesto || 'Técnico Especialista'}</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">Área: ${trab.area_trabajo || 'Planta / Mina'}</div>
+                </div>
+                <div>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block;">Contacto Registrado</small>
+                    <code style="color: var(--accent-cyan); font-size: 0.82rem;">${trab.email_personal || 'No registrado'}</code>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">Celular: ${trab.telefono_personal || 'No registrado'}</div>
+                </div>
+            </div>
+
+            <!-- Tabla de Certificados -->
+            <div style="margin-bottom: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Certificaciones y Homologaciones (${certs.length})</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary);">Exigidas por D.S. 024-2016-EM</span>
+                </div>
+                <div style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.04); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
+                                <th style="padding: 10px;">#</th>
+                                <th style="padding: 10px;">Curso / Capacitación</th>
+                                <th style="padding: 10px;">Emisión</th>
+                                <th style="padding: 10px;">Vencimiento</th>
+                                <th style="padding: 10px; text-align: center;">Estado</th>
+                                <th style="padding: 10px; text-align: center;">Documento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filasCerts || '<tr><td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">No se registraron certificados en base de datos.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); padding: 12px; border-radius: 8px;">
+                <div>
+                    <strong style="color: #fff; font-size: 0.88rem;">¿Hay datos desactualizados o tu certificado carece de DNI?</strong>
+                    <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-secondary);">Genera una solicitud formal de corrección para auditoría HSE.</p>
+                </div>
+                <button type="button" class="btn-warning" onclick="abrirModalSolicitudDesdeKiosco()" style="font-size: 0.85rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 700; border: none; border-radius: 6px; cursor: pointer;">
+                    ⚠️ Solicitar Corrección de Datos
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.style.display = 'block';
+}
+
+window.initTabKiosko = initTabKiosko;
+window.consultarKioskoDesdeTab = consultarKioskoDesdeTab;
+window.renderizarKioskoEnTab = renderizarKioskoEnTab;
+
 
 
 
