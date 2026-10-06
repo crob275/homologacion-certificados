@@ -848,13 +848,24 @@ async function handleCertificateUpload(e) {
                     ? `<span class="badge badge-success" style="font-size: 0.78rem; margin-bottom: 0.5rem; display: inline-block;">Nuevo Trabajador Registrado en BD</span><br>`
                     : `<span class="badge badge-info" style="font-size: 0.78rem; margin-bottom: 0.5rem; display: inline-block;">Trabajador Existente Vinculado en BD</span><br>`);
 
+            const careceDni = result.requiere_regularizar_dni || !result.dni_extraido_en_pdf;
+            const bannerDniAlerta = careceDni ? `
+                <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; color: #fbbf24; font-size: 0.85rem;">
+                    ⚠️ <strong>Aviso de Identificación:</strong> Este certificado digital no contiene número de DNI impreso (solo el nombre). El sistema asignó un documento temporal (<code>${bd.trabajador_documento}</code>). 
+                    Por favor haga clic abajo en <strong>[ ⚠️ Completar DNI Real ]</strong> para colocar su DNI auténtico.
+                </div>
+            ` : '';
+
             ocrText.innerHTML = `
                 ${badgeNuevo}
+                ${bannerDniAlerta}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 5px;">
                     <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
                         <small style="color: var(--text-secondary); display: block;">Trabajador / DNI</small>
                         <strong style="color: #fff;">${bd.trabajador_nombres}</strong>
-                        <div style="color: var(--accent-cyan); font-size: 0.8rem; font-family: monospace;">DNI: ${bd.trabajador_documento}</div>
+                        <div style="color: ${careceDni ? 'var(--accent-amber)' : 'var(--accent-cyan)'}; font-size: 0.8rem; font-family: monospace;">
+                            DNI: ${bd.trabajador_documento} ${careceDni ? '<span style="font-size: 0.72rem; background: #f59e0b; color: #000; padding: 1px 4px; border-radius: 3px; font-weight: bold; margin-left: 4px;">Temporal</span>' : ''}
+                        </div>
                     </div>
                     <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
                         <small style="color: var(--text-secondary); display: block;">Curso Acreditado</small>
@@ -871,8 +882,8 @@ async function handleCertificateUpload(e) {
                     <div>
                         Empresa: <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc}) &bull; Notificación: <code>${bd.trabajador_email_personal}</code>
                     </div>
-                    <button type="button" class="btn-primary" style="font-size: 0.78rem; padding: 4px 12px; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;" onclick="abrirModalEditarTrabajador('${bd.trabajador_id}')">
-                        ✏️ Regularizar / Editar Ficha de ${bd.trabajador_nombres}
+                    <button type="button" class="btn-primary" style="font-size: 0.78rem; padding: 4px 12px; ${careceDni ? 'background: #f59e0b; color: #000; font-weight: bold; border: 1px solid #fbbf24;' : 'background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${bd.trabajador_id}')">
+                        ${careceDni ? '⚠️ Completar DNI Real de ' + bd.trabajador_nombres : '✏️ Regularizar / Editar Ficha de ' + bd.trabajador_nombres}
                     </button>
                 </div>
             `;

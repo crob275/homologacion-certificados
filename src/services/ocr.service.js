@@ -27,31 +27,75 @@ async function extractTextFromPDF(pdfBuffer) {
             console.log('🔍 Realizando escaneo OCR de imagen incrustada con Tesseract...');
             let pos = 0;
             while ((pos = pdfBuffer.indexOf(Buffer.from('/Subtype /Image'), pos + 1)) !== -1) {
-                const chunk = pdfBuffer.subarray(Math.max(0, pos - 200), pos + 100).toString();
+                const chunk = pdfBuffer.subarray(Math.max(0, pos - 300), pos + 200).toString();
                 const wM = chunk.match(/\/Width\s+(\d+)/);
                 const hM = chunk.match(/\/Height\s+(\d+)/);
-                const isRGB = chunk.includes('/DeviceRGB');
-                if (wM && hM && isRGB) {
+                const isRGB = chunk.includes('/DeviceRGB') || chunk.includes('ColorSpace 10 0 R');
+                const isRunLength = chunk.includes('RunLengthDecode');
+                const isFlate = chunk.includes('FlateDecode');
+
+                if (wM && hM) {
                     const width = parseInt(wM[1]);
                     const height = parseInt(hM[1]);
                     const sStart = pdfBuffer.indexOf(Buffer.from('stream'), pos) + 6;
                     let s = sStart;
                     while (pdfBuffer[s] === 10 || pdfBuffer[s] === 13) s++;
                     const sEnd = pdfBuffer.indexOf(Buffer.from('endstream'), s);
-                    const decomp = zlib.inflateSync(pdfBuffer.subarray(s, sEnd));
+                    const streamSlice = pdfBuffer.subarray(s, sEnd);
 
-                    const png = new PNG({ width, height });
-                    for (let i = 0, j = 0; i < decomp.length; i += 3, j += 4) {
-                        png.data[j] = decomp[i];
-                        png.data[j + 1] = decomp[i + 1];
-                        png.data[j + 2] = decomp[i + 2];
-                        png.data[j + 3] = 255;
+                    let decomp = null;
+                    if (isRunLength) {
+                        // Decodificador RunLengthDecode estándar PDF
+                        const outBuf = Buffer.alloc(width * height * 3);
+                        let inIdx = 0;
+                        let outIdx = 0;
+                        while (inIdx < streamSlice.length && outIdx < outBuf.length) {
+                            const b = streamSlice[inIdx++];
+                            if (b === 128) break; // EOD
+                            if (b <= 127) {
+                                const count = b + 1;
+                                streamSlice.copy(outBuf, outIdx, inIdx, inIdx + count);
+                                inIdx += count;
+                                outIdx += count;
+                            } else {
+                                const count = 257 - b;
+                                const val = streamSlice[inIdx++];
+                                outBuf.fill(val, outIdx, outIdx + count);
+                                outIdx += count;
+                            }
+                        }
+                        decomp = outBuf.subarray(0, outIdx);
+                    } else if (isFlate || !isRunLength) {
+                        try {
+                            decomp = zlib.inflateSync(streamSlice);
+                        } catch (zErr) {
+                            // Raw stream
+                            decomp = streamSlice;
+                        }
                     }
-                    const pngBuffer = PNG.sync.write(png);
-                    const { data: { text: ocrText } } = await Tesseract.recognize(pngBuffer, 'spa');
-                    if (ocrText && ocrText.trim().length > 10) {
-                        text = ocrText;
-                        break;
+
+                    if (decomp && decomp.length >= width * height) {
+                        const png = new PNG({ width, height });
+                        const isColor = decomp.length >= width * height * 3;
+                        for (let i = 0, j = 0; i < width * height; i++, j += 4) {
+                            if (isColor) {
+                                png.data[j] = decomp[i * 3];
+                                png.data[j + 1] = decomp[i * 3 + 1];
+                                png.data[j + 2] = decomp[i * 3 + 2];
+                            } else {
+                                png.data[j] = decomp[i];
+                                png.data[j + 1] = decomp[i];
+                                png.data[j + 2] = decomp[i];
+                            }
+                            png.data[j + 3] = 255;
+                        }
+                        const pngBuffer = PNG.sync.write(png);
+                        const { data: { text: ocrText } } = await Tesseract.recognize(pngBuffer, 'spa');
+                        if (ocrText && ocrText.trim().length > 10) {
+                            text = ocrText;
+                            console.log('✅ OCR con Tesseract reconoció exitosamente texto en imagen del PDF:', ocrText.substring(0, 100) + '...');
+                            break;
+                        }
                     }
                 }
             }
@@ -183,7 +227,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         nombreCurso = 'Manejo Defensivo y Operación en Unidad Minera';
     } else if (upperText.includes('INDUCCIÓN GENERAL') || upperText.includes('INDUCCION GENERAL') || upperText.includes('ANEXO 6') || upperText.includes('ANEXO 4') || upperText.includes('ANEXO 5')) {
         nombreCurso = 'Inducción y Capacitación General de Seguridad Minera (Anexo 6)';
-    } else if (upperText.includes('DESARROLLO CON IA') || upperText.includes('INICIACIÓN AL DESARROLLO CON IA') || upperText.includes('INICIACION AL DESARROLLO CON IA')) {
+    } else if (upperText.includes('DESARROLLO CON IA') || upperText.includes('INICIACIÓN AL DESARROLLO CON IA') || upperText.includes('INICIACION AL DESARROLLO CON IA') || (filename && filename.toUpperCase().includes('DESARROLLO') && filename.toUpperCase().includes('IA'))) {
         nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
     } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA') || upperText.includes('DIPLOMADO')) {
         nombreCurso = 'Diplomado en Inteligencia Artificial y Tecnologías Digitales';
@@ -191,6 +235,8 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         const matchCursoGenerico = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n|Diplomado(?:\s+en|\s+de)?)[\:\s]+([^\n\r;”"]{10,120})/i);
         if (matchCursoGenerico) {
             nombreCurso = matchCursoGenerico[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
+        } else if (filename && /IA|INTELIGENCIA|PROGRAMACION|PYTHON|REACT|DESARROLLO/i.test(filename)) {
+            nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
         } else {
             nombreCurso = 'Capacitación en Seguridad Ocupacional y Minera';
         }
@@ -198,7 +244,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // 4. Extraer Entidad Emisora
     let entidad = 'Centro de Capacitación y Homologación Especializado';
-    if (upperText.includes('MOUREDEV') || upperText.includes('BIG SCHOOL')) {
+    if (upperText.includes('MOUREDEV') || upperText.includes('BIG SCHOOL') || (filename && /mouredev|bigschool/i.test(filename))) {
         entidad = 'MoureDev & BIG School';
     } else if (upperText.includes('ELECTROTECH')) {
         entidad = 'ELECTROTECH - Instituto de Capacitaciones Profesionales';
@@ -220,7 +266,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // 5. Extraer Horas Lectivas
     let horas = 16;
-    const matchHoras = text.match(/(\d+)\s*(?:horas|hrs|Horas|académicas|horas cronológicas)/i);
+    const matchHoras = text.match(/(?:DURACI[OÓ]N\s*:?\s*)?(\d+)\s*(?:horas|hrs|Horas|académicas|horas cronológicas)/i) || text.match(/DURACI[OÓ]N\s*:?\s*(\d+)/i);
     if (matchHoras && matchHoras[1]) {
         horas = parseInt(matchHoras[1]);
     }
@@ -239,7 +285,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
             fechaEmision = `${anio}-${meses[mesNombre]}-${dia}`;
         }
     } else {
-        const matchFechaSlash = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        const matchFechaSlash = text.match(/(?:FECHA\s*:?\s*)?(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i);
         if (matchFechaSlash) {
             fechaEmision = `${matchFechaSlash[3]}-${matchFechaSlash[2].padStart(2, '0')}-${matchFechaSlash[1].padStart(2, '0')}`;
         }

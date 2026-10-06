@@ -80,9 +80,12 @@ async function uploadPDFOCR(req, res) {
         let discrepanciaDetectada = false;
         let mensajeDiscrepancia = null;
 
+        const dniExtraido = extracted.dniTrabajador && extracted.dniTrabajador.length === 8;
+        const requiereRegularizarDni = !dniExtraido;
+
         if (!trabajador) {
             const nuevoId = 'tr-' + Date.now();
-            const nuevoDoc = extracted.dniTrabajador || String(Math.floor(Math.random() * 89999999 + 10000000));
+            const nuevoDoc = dniExtraido ? extracted.dniTrabajador : String(Math.floor(Math.random() * 89999999 + 10000000));
             let nombres = '';
             let apellidos = '';
             let emailPersonal = '';
@@ -184,6 +187,8 @@ async function uploadPDFOCR(req, res) {
             es_actualizacion: Boolean(certExistente),
             discrepancia_detectada: discrepanciaDetectada,
             mensaje_discrepancia: mensajeDiscrepancia,
+            dni_extraido_en_pdf: dniExtraido,
+            requiere_regularizar_dni: requiereRegularizarDni,
             correo_enviado: Boolean(envioEmailResultado),
             destinatario_correo: trabajador.email_personal,
             message: esNuevoTrabajador 
