@@ -1,5 +1,6 @@
 const { allDB, getDB, runDB } = require('../config/database');
 const { normalizarTelefonoPeru } = require('../services/excel.service');
+const { despacharCorreoInternet } = require('../services/email.service');
 
 async function listarTrabajadores(req, res) {
     try {
@@ -236,17 +237,26 @@ async function crearSolicitudCorreccion(req, res) {
 
 async function listarSolicitudesCorreccion(req, res) {
     try {
-        const solicitudes = await allDB(`
+        const { empresa_id } = req.query;
+        let sql = `
             SELECT s.*, 
                    t.nombres as trabajador_nombres,
                    t.apellidos as trabajador_apellidos,
                    t.numero_documento as trabajador_doc,
+                   t.empresa_id,
                    e.razon_social as empresa_nombre
             FROM solicitudes_correccion s
             JOIN trabajadores t ON s.trabajador_id = t.id
             JOIN empresas e ON t.empresa_id = e.id
-            ORDER BY s.fecha_solicitud DESC
-        `);
+        `;
+        const params = [];
+        if (empresa_id) {
+            sql += ` WHERE t.empresa_id = ? `;
+            params.push(empresa_id);
+        }
+        sql += ` ORDER BY s.fecha_solicitud DESC`;
+
+        const solicitudes = await allDB(sql, params);
         res.json(solicitudes);
     } catch (err) {
         res.status(500).json({ error: 'Error listando solicitudes: ' + err.message });
@@ -283,6 +293,62 @@ async function resolverSolicitudCorreccion(req, res) {
                 fecha_resolucion = CURRENT_TIMESTAMP
             WHERE id = ?
         `, [nuevoEstado, respuesta_admin || '', revisor_nombre || 'Administrador HSE', id]);
+
+        // Notificación automática al trabajador por correo electrónico
+        const destinatarioEmail = sol.solicitante_contacto && sol.solicitante_contacto.includes('@') 
+            ? sol.solicitante_contacto.trim() 
+            : (await getDB('SELECT email_personal FROM trabajadores WHERE id = ?', [sol.trabajador_id]))?.email_personal;
+
+        if (destinatarioEmail && destinatarioEmail.includes('@')) {
+            try {
+                const asunto = `[HOMOLOGACIÓN D.S. 024] Solicitud de Corrección ${nuevoEstado}`;
+                const colorHeader = nuevoEstado === 'APROBADA' ? '#10b981' : '#ef4444';
+                const html = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 10px; overflow: hidden; border: 1px solid #334155;">
+                        <div style="background: ${colorHeader}; padding: 18px 24px; text-align: center; color: white;">
+                            <h2 style="margin: 0; font-size: 1.3rem;">Resolución de Solicitud de Corrección</h2>
+                            <small style="opacity: 0.9;">Control de Seguridad Minera D.S. 024-2016-EM</small>
+                        </div>
+                        <div style="padding: 24px;">
+                            <p style="font-size: 1rem; color: #e2e8f0;">Estimado(a) trabajador(a),</p>
+                            <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5;">
+                                Su solicitud para la rectificación de <strong>${sol.campo_afectado}</strong> ha sido dictaminada como:
+                            </p>
+                            <div style="text-align: center; margin: 20px 0;">
+                                <span style="background: ${colorHeader}; color: white; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 1.1rem; display: inline-block;">
+                                    ${nuevoEstado}
+                                </span>
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.9rem;">
+                                <tr>
+                                    <td style="padding: 10px; border-bottom: 1px solid #334155; color: #94a3b8;">Dato Solicitado:</td>
+                                    <td style="padding: 10px; border-bottom: 1px solid #334155; color: #f8fafc; font-weight: bold;">${sol.valor_solicitado}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; border-bottom: 1px solid #334155; color: #94a3b8;">Observación del Administrador:</td>
+                                    <td style="padding: 10px; border-bottom: 1px solid #334155; color: #f8fafc;">${respuesta_admin || 'Conforme a normativa'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; color: #94a3b8;">Revisado Por:</td>
+                                    <td style="padding: 10px; color: #38bdf8;">${revisor_nombre || 'Auditoría HSE'}</td>
+                                </tr>
+                            </table>
+                            <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 25px; text-align: center;">
+                                Puede volver a consultar su carnet de habilitación en el Kiosco Digital en cualquier momento.
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                await despacharCorreoInternet({
+                    to: destinatarioEmail,
+                    subject: asunto,
+                    html: html
+                });
+            } catch (mailErr) {
+                console.warn('⚠️ No se pudo enviar correo de resolución:', mailErr.message);
+            }
+        }
 
         res.json({
             exito: true,

@@ -2170,7 +2170,11 @@ async function loadSolicitudesCorreccion() {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-secondary);">Cargando solicitudes de auditoría...</td></tr>';
 
     try {
-        const res = await fetch('/api/v1/trabajadores/solicitudes-correccion');
+        let url = '/api/v1/trabajadores/solicitudes-correccion';
+        if (usuarioSesionActivo && usuarioSesionActivo.rol === 'CONTRATISTA' && usuarioSesionActivo.empresa_id) {
+            url += '?empresa_id=' + encodeURIComponent(usuarioSesionActivo.empresa_id);
+        }
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Error al obtener solicitudes.');
 
         const lista = await res.json();
