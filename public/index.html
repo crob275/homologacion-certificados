@@ -271,10 +271,10 @@
                     <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Descargue padrones actualizados con formato normativo D.S. 024-2016-EM para fiscalización y control de accesos.</p>
                 </div>
                 <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
-                    <a href="/api/v1/reportes/descargar-padron-excel" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background: linear-gradient(135deg, #10b981, #047857);">
+                    <button type="button" onclick="descargarPadronFiltrado()" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background: linear-gradient(135deg, #10b981, #047857); border: none; cursor: pointer; padding: 0.6rem 1.1rem; border-radius: 8px;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                         <span>Descargar Padrón General (.xlsx)</span>
-                    </a>
+                    </button>
                 </div>
             </div>
 

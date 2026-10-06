@@ -924,12 +924,17 @@ async function handleCertificateUpload(e) {
                         ? `<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">Nuevo</span>`
                         : `<span class="badge badge-info" style="font-size: 0.7rem; padding: 2px 6px;">Existente</span>`;
                     
+                    const careceDni = item.requiere_regularizar_dni || !item.dni_extraido_en_pdf;
+                    const tagDni = careceDni
+                        ? `<span class="badge badge-warning" style="font-size: 0.68rem; padding: 1px 5px;" title="El certificado PDF no traía DNI impreso. Se asignó ID provisional.">⚠️ DNI Pendiente</span>`
+                        : `<span class="badge badge-success" style="font-size: 0.68rem; padding: 1px 5px;">✓ DNI PDF</span>`;
+                    
                     filasResultados += `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${careceDni ? 'background: rgba(245, 158, 11, 0.04);' : ''}">
                             <td style="padding: 6px 10px; color: var(--text-secondary); font-size: 0.8rem;">${idx + 1}</td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #fff;">
                                 ${trabNombre}<br>
-                                <small style="color: var(--accent-cyan); font-family: monospace;">DNI: ${trabDni}</small> ${tagNuevo}
+                                <small style="color: ${careceDni ? 'var(--accent-amber)' : 'var(--accent-cyan)'}; font-family: monospace;">Doc: ${trabDni}</small> ${tagNuevo} ${tagDni}
                             </td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; color: var(--accent-amber);">
                                 <strong>${certCurso}</strong><br>
@@ -947,8 +952,8 @@ async function handleCertificateUpload(e) {
                                         </button>
                                     ` : ''}
                                     ${trabId ? `
-                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" onclick="abrirModalEditarTrabajador('${trabId}')" title="Editar / Regularizar Ficha">
-                                            ✏️ Editar
+                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; ${careceDni ? 'background: rgba(245, 158, 11, 0.25); border-color: #f59e0b; color: #fbbf24; font-weight: bold;' : 'background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${trabId}')" title="${careceDni ? 'Completar DNI Real de este Trabajador' : 'Editar Información'}">
+                                            ${careceDni ? '⚠️ Completar DNI' : '✏️ Editar'}
                                         </button>
                                     ` : ''}
                                 </div>
@@ -958,7 +963,18 @@ async function handleCertificateUpload(e) {
                 }
             });
 
+            const totalSinDni = (result.resultados || []).filter(r => r.requiere_regularizar_dni).length;
+            const bannerSinDni = totalSinDni > 0 ? `
+                <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <strong style="color: #fbbf24; font-size: 0.88rem;">⚠️ ${totalSinDni} Certificado(s) subido(s) no incluían DNI impreso en el PDF</strong>
+                        <div style="color: var(--text-secondary); font-size: 0.78rem;">El sistema registró la ficha por nombre. Haga clic en <strong>[ ⚠️ Completar DNI ]</strong> para registrar el documento oficial de cada trabajador.</div>
+                    </div>
+                </div>
+            ` : '';
+
             ocrText.innerHTML = `
+                ${bannerSinDni}
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
                     <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; text-align: center;">
                         <small style="color: var(--text-secondary); display: block;">Total PDFs</small>
@@ -2491,6 +2507,18 @@ function renderizarKioskoEnTab(data) {
 window.initTabKiosko = initTabKiosko;
 window.consultarKioskoDesdeTab = consultarKioskoDesdeTab;
 window.renderizarKioskoEnTab = renderizarKioskoEnTab;
+
+function descargarPadronFiltrado() {
+    let url = '/api/v1/reportes/descargar-padron-excel';
+    const empTarget = esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : superAdminScopeCompanyId;
+    if (empTarget) {
+        url += '?empresa_id=' + encodeURIComponent(empTarget);
+    }
+    window.location.href = url;
+}
+
+window.descargarPadronFiltrado = descargarPadronFiltrado;
+
 
 
 

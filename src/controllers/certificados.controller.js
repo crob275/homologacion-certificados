@@ -358,12 +358,16 @@ async function uploadBatchPDFOCR(req, res) {
                     console.warn(`⚠️ Error enviando correo a ${trabajador.email_personal}:`, batchMailErr.message);
                 }
 
+                const careceDNI = !extracted.dniTrabajador || extracted.dniTrabajador.length !== 8;
+
                 resultados.push({
                     archivo_original: file.originalname,
                     trabajador_id: trabajador.id,
                     trabajador_nombre: `${trabajador.nombres} ${trabajador.apellidos}`,
                     trabajador_dni: trabajador.numero_documento,
                     trabajador_email: trabajador.email_personal,
+                    dni_extraido_en_pdf: Boolean(extracted.dniTrabajador && extracted.dniTrabajador.length === 8),
+                    requiere_regularizar_dni: careceDNI,
                     correo_notificado: correoEnviado,
                     curso_reconocido: extracted.nombreCurso,
                     entidad_emisora: extracted.entidad,
