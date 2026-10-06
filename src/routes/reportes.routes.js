@@ -8,6 +8,7 @@ router.get('/powerbi-metrics', reportesController.getReportePowerBI);
 router.get('/plantilla-excel', certificadosController.descargarPlantillaExcel);
 router.get('/descargar-plantilla-xlsx', reportesController.descargarPlantillaOficialExcel);
 router.get('/descargar-padron-excel', reportesController.descargarPadronExcel);
+router.get('/descargar-respaldo-sql', reportesController.descargarRespaldoSQL);
 
 // Rutas de Alertas Automatizadas y Correo 90 Días
 router.post('/alertas/ejecutar-escaneo', reportesController.ejecutarEscaneoAlertas);

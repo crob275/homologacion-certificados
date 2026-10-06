@@ -106,6 +106,61 @@ function descargarPlantillaOficialExcel(req, res) {
     }
 }
 
+// Descarga / Volcado Completo de la Base de Datos en Formato SQL (Compatible con MySQL Workbench y local)
+async function descargarRespaldoSQL(req, res) {
+    try {
+        const { allDB } = require('../config/database');
+        
+        const empresas = await allDB('SELECT * FROM empresas');
+        const usuarios = await allDB('SELECT * FROM usuarios');
+        const trabajadores = await allDB('SELECT * FROM trabajadores');
+        const certificados = await allDB('SELECT * FROM certificados');
+        const solicitudes = await allDB('SELECT * FROM solicitudes_correccion');
+        const alertas = await allDB('SELECT * FROM alertas_notificaciones');
+
+        let sql = `-- ========================================================\n`;
+        sql += `-- RESPALDO INTEGRAL DE BASE DE DATOS HOMOLOGACION D.S. 024\n`;
+        sql += `-- Generado: ${new Date().toISOString()}\n`;
+        sql += `-- ========================================================\n\n`;
+        sql += `CREATE DATABASE IF NOT EXISTS \`homologacion_db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n`;
+        sql += `USE \`homologacion_db\`;\n\n`;
+        sql += `SET FOREIGN_KEY_CHECKS = 0;\n\n`;
+
+        const esc = (v) => {
+            if (v === null || v === undefined) return 'NULL';
+            return `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+        };
+
+        const exportTable = (name, rows) => {
+            if (!rows || rows.length === 0) return `-- Tabla ${name}: 0 registros\n\n`;
+            let out = `-- Datos de ${name} (${rows.length} registros)\n`;
+            for (let r of rows) {
+                const cols = Object.keys(r);
+                const vals = cols.map(c => esc(r[c])).join(', ');
+                out += `INSERT INTO \`${name}\` (\`${cols.join('`, `')}\`) VALUES (${vals});\n`;
+            }
+            out += `\n`;
+            return out;
+        };
+
+        sql += exportTable('empresas', empresas);
+        sql += exportTable('usuarios', usuarios);
+        sql += exportTable('trabajadores', trabajadores);
+        sql += exportTable('certificados', certificados);
+        sql += exportTable('solicitudes_correccion', solicitudes);
+        sql += exportTable('alertas_notificaciones', alertas);
+
+        sql += `SET FOREIGN_KEY_CHECKS = 1;\n`;
+
+        const fecha = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/sql');
+        res.setHeader('Content-Disposition', `attachment; filename="homologacion_db_respaldo_${fecha}.sql"`);
+        res.send(sql);
+    } catch (err) {
+        res.status(500).json({ error: 'Error exportando base de datos: ' + err.message });
+    }
+}
+
 module.exports = {
     getDashboardKPIs,
     getReportePowerBI,
@@ -114,5 +169,6 @@ module.exports = {
     configurarModoPruebaEmail,
     enviarAlertaIndividualController,
     descargarPadronExcel,
-    descargarPlantillaOficialExcel
+    descargarPlantillaOficialExcel,
+    descargarRespaldoSQL
 };
