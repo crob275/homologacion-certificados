@@ -532,25 +532,6 @@ async function setupMySQLSchemaAndSeeds() {
             `);
         }
 
-        // Migración de Seguridad: Asegurar que Christian Renato Ortega Bernedo esté registrado en trabajadores y sanear Felipe Sáenz
-        try {
-            const [felipeRows] = await mysqlPool.query("SELECT id FROM trabajadores WHERE nombres LIKE '%FELIPE%' OR apellidos LIKE '%SÁENZ%' OR apellidos LIKE '%SAENZ%'");
-            for (let f of felipeRows) {
-                await mysqlPool.query("DELETE FROM certificados WHERE trabajador_id = ?", [f.id]);
-                await mysqlPool.query("DELETE FROM trabajadores WHERE id = ?", [f.id]);
-            }
-
-            const [chrisRows] = await mysqlPool.query("SELECT id FROM trabajadores WHERE numero_documento = '70352752' OR email_personal = 'cristianre257@gmail.com'");
-            if (chrisRows.length === 0) {
-                await mysqlPool.query(`
-                    INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, estado_habilitacion)
-                    VALUES ('tr-christian', 'emp-3', 'DNI', '70352752', 'Christian Renato', 'Ortega Bernedo', 'cristianre257@gmail.com', '+51 987654321', 'Gestor Técnico Especialista', 'Planta Concentradora', 'HABILITADO')
-                `);
-            }
-        } catch(migErr) {
-            console.log('Nota de migración trabajador:', migErr.message);
-        }
-
         console.log('✅ Esquema homologacion_db en MySQL Workbench listo para producción (Limpio).');
 
     } catch (err) {

@@ -12,6 +12,7 @@ router.get('/solicitudes-correccion', trabajadoresController.listarSolicitudesCo
 router.put('/solicitudes-correccion/:id/resolver', trabajadoresController.resolverSolicitudCorreccion);
 
 router.post('/', trabajadoresController.crearTrabajador);
+router.delete('/limpiar-todo', trabajadoresController.limpiarTodosTrabajadores);
 router.put('/:id', trabajadoresController.actualizarTrabajador);
 router.delete('/:id', trabajadoresController.eliminarTrabajador);
 

@@ -80,10 +80,28 @@ async function actualizarTrabajador(req, res) {
 async function eliminarTrabajador(req, res) {
     try {
         const { id } = req.params;
+        await runDB('DELETE FROM solicitudes_correccion WHERE trabajador_id = ?', [id]);
+        await runDB('DELETE FROM alertas_notificaciones WHERE trabajador_id = ?', [id]);
+        await runDB('DELETE FROM certificados WHERE trabajador_id = ?', [id]);
         await runDB('DELETE FROM trabajadores WHERE id = ?', [id]);
         res.json({ message: 'Trabajador eliminado de la Base de Datos.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+}
+
+async function limpiarTodosTrabajadores(req, res) {
+    try {
+        await runDB('DELETE FROM solicitudes_correccion');
+        await runDB('DELETE FROM alertas_notificaciones');
+        await runDB('DELETE FROM certificados');
+        await runDB('DELETE FROM trabajadores');
+        res.json({
+            exito: true,
+            message: 'Todos los trabajadores, certificados y solicitudes de prueba han sido eliminados de la Base de Datos exitosamente.'
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al limpiar la base de datos: ' + err.message });
     }
 }
 
@@ -368,5 +386,6 @@ module.exports = {
     reenviarNotificacionTrabajador,
     crearSolicitudCorreccion,
     listarSolicitudesCorreccion,
-    resolverSolicitudCorreccion
+    resolverSolicitudCorreccion,
+    limpiarTodosTrabajadores
 };
