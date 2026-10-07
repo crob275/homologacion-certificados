@@ -1151,7 +1151,15 @@ async function handleExcelUpload(e) {
 
         excelText.innerHTML = `
             <div style="color: #34d399; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">
-                ✅ ¡CARGA MASIVA COMPLETADA Y NOTIFICACIONES DE CORREO ENVIADAS!
+                ✅ ¡CARGA MASIVA REGISTRADA Y NOTIFICACIONES DE CORREO ENVIADAS!
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; font-size: 0.85rem; color: #fef3c7; line-height: 1.5;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <span style="font-size: 1.2rem;">📎</span>
+                    <strong style="color: #fde68a; font-size: 0.92rem;">REGISTRO PROVISIONAL (80% COMPLETADO) - FALTA ADJUNTAR ARCHIVO EN PDF:</strong>
+                </div>
+                Los trabajadores han sido registrados exitosamente en la plataforma, pero <strong>aún falta adjuntar el archivo PDF original de cada certificado</strong>. Para auditoría en garita según D.S. 024-2016-EM, suba los certificados escaneados en <code>[ Carga de Cuadrillas & OCR ]</code> para que el personal cuente con sustento digital al 100%.
             </div>
 
             ${bannerAntiDuplicados}

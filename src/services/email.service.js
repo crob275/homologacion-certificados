@@ -701,24 +701,27 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
     let explicacionHTML = '';
 
     const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
-    const faltaDatos = dniEsTemporal || !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
+    const cargoIncompleto = !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
+    const faltaPDFSustento = !certificado.url_pdf_storage && (!certificado.pdf_filename || certificado.pdf_filename.includes('Excel'));
+    const faltaDatos = dniEsTemporal || cargoIncompleto || faltaPDFSustento;
 
     if (faltaDatos) {
         estadoKey = 'PENDIENTE_REGULARIZAR';
-        estadoLabel = '⚠️ REGISTRO PROVISIONAL (80% COMPLETADO)';
+        estadoLabel = '⚠️ REGISTRO PROVISIONAL (80% COMPLETADO - FALTA SUSTENTO PDF)';
         bannerGrad = 'linear-gradient(135deg, #d97706, #b45309)';
         colorTextoBanner = '#ffffff';
-        iconoBanner = '📝';
-        tituloBanner = 'CERTIFICADO REGISTRADO - REQUIERE REGULARIZAR DATOS';
+        iconoBanner = '📎';
+        tituloBanner = 'CERTIFICADO REGISTRADO - FALTA ADJUNTAR SUSTENTO EN PDF';
         explicacionHTML = `
             <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #fde68a; display: block; margin-bottom: 4px;">⚠️ ACCIÓN OBLIGATORIA DE REGULARIZACIÓN (AUDITORÍA HSE):</strong>
-                Tu certificado para <strong>${certificado.nombre_curso}</strong> ha sido cargado con éxito en la plataforma, pero <strong>faltan datos reglamentarios indispensables</strong> para emitir tu pase definitivo de ingreso a mina:<br>
-                <ul>
-                    ${dniEsTemporal ? '<li><strong>Falta DNI oficial:</strong> El PDF no contiene tu número de documento legible. Se asignó un identificador provisional (' + trabajador.numero_documento + ').</li>' : ''}
-                    ${(!trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente')) ? '<li><strong>Cargo / Área no asignada:</strong> Tu perfil figura como "Pendiente de Asignación".</li>' : ''}
+                <strong style="color: #fde68a; display: block; margin-bottom: 6px;">⚠️ ADVERTENCIA OBLIGATORIA (AUDITORÍA HSE D.S. 024-2016-EM):</strong>
+                Tus datos de curso para <strong>${certificado.nombre_curso}</strong> fueron cargados por matriz administrativa, pero <strong>el registro está al 80% y requiere regularización</strong> antes de emitir tu acreditación definitiva:<br>
+                <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6;">
+                    ${faltaPDFSustento ? '<li><strong>📎 Falta adjuntar archivo PDF original:</strong> Se registró por planilla/Excel pero aún no se ha cargado el documento digital escaneado del diploma para auditoría en garita.</li>' : ''}
+                    ${dniEsTemporal ? '<li><strong>Falta DNI oficial:</strong> Se asignó un identificador provisional (' + trabajador.numero_documento + ').</li>' : ''}
+                    ${cargoIncompleto ? '<li><strong>Cargo / Área no asignada:</strong> Tu perfil figura como "Pendiente de Asignación".</li>' : ''}
                 </ul>
-                👉 <strong>¿Qué debes hacer?:</strong> Ingresa a la plataforma y usa el botón <code>[ ⚠️ Solicitar Corrección de Datos ]</code> o contacta a <strong>${remitenteNombre}</strong> (${remitenteRol}) para vincular tu DNI y cargo oficial.
+                👉 <strong>¿Qué debes hacer?:</strong> Comunícate con tu empresa contratista (<strong>${empresa.razon_social}</strong>) o sube tu diploma en la sección <code>[ Carga de Cuadrillas & OCR ]</code> para anexar el PDF original a tu expediente.
             </div>
         `;
     } else if (diasRestantes <= 0) {
@@ -866,10 +869,14 @@ async function enviarNotificacionIndividualTrabajador(params) {
     }
 
     const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
-    const faltaDatos = dniEsTemporal || !trabajador.cargo_puesto || trabajador.cargo_puesto === 'Pendiente de Definición';
+    const cargoIncompleto = !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
+    const faltaPDFSustento = !certificado.url_pdf_storage && (!certificado.pdf_filename || certificado.pdf_filename.includes('Excel'));
+    const faltaDatos = dniEsTemporal || cargoIncompleto || faltaPDFSustento;
 
     let asunto = '';
-    if (faltaDatos) {
+    if (faltaPDFSustento) {
+        asunto = `⚠️ [REGISTRO PROVISIONAL 80%] Falta Adjuntar Certificado en PDF - Curso: ${certificado.nombre_curso} (${trabajador.nombres} ${trabajador.apellidos})`;
+    } else if (faltaDatos) {
         asunto = `⚠️ [REGISTRO PROVISIONAL 80%] Certificado de ${certificado.nombre_curso} - Faltan Datos por Regularizar (${trabajador.nombres} ${trabajador.apellidos})`;
     } else if (diasRestantes <= 0) {
         asunto = `⛔ [ACCESO DENEGADO] Certificado Vencido de ${certificado.nombre_curso} - Pase Inhabilitado en Garita`;
@@ -1005,9 +1012,14 @@ async function enviarReporteCargaEmpresa({ empresa, remitente, itemsProcesados }
                     </div>
                 </div>
 
-                <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 15px;">
-                    Se completó la carga masiva y se enviaron las notificaciones oficiales correspondientes a cada trabajador. A continuación el detalle consolidado:
+                <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">
+                    Se procesó la nómina de trabajadores mediante archivo administrativo/Excel.
                 </p>
+
+                <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 14px; border-radius: 6px; color: #fef3c7; margin-bottom: 16px; font-size: 12.5px; line-height: 1.5;">
+                    <strong style="color: #fde68a;">📎 RECORDATORIO DE AUDITORÍA (D.S. 024-2016-EM):</strong><br>
+                    Los certificados cargados por planilla Excel se encuentran en <strong>Estado Provisional (80%)</strong>. Es indispensable <strong>adjuntar el archivo PDF escaneado del diploma/certificado original</strong> en el módulo <code>[ Carga de Cuadrillas & OCR ]</code> para que el personal cuente con sustento digital auditado en garita y no tenga observaciones en fiscalización.
+                </div>
 
                 ${filasDetalleHTML}
             </div>
