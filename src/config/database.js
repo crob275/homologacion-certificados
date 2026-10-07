@@ -372,7 +372,7 @@ async function setupMySQLSchemaAndSeeds() {
                 fecha_vencimiento DATE NOT NULL,
                 codigo_qr_hash VARCHAR(100),
                 pdf_filename VARCHAR(255),
-                url_pdf_storage VARCHAR(255),
+                url_pdf_storage LONGTEXT,
                 estado_validacion ENUM('EN_VALIDACION', 'APROBADO', 'RECHAZADO') DEFAULT 'EN_VALIDACION',
                 estado_vigencia ENUM('HABILITADO', 'PROXIMO_A_VENCER', 'INHABILITADO') DEFAULT 'HABILITADO',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -469,13 +469,13 @@ async function setupMySQLSchemaAndSeeds() {
         await safeAddColumn('certificados', 'trabajador_id VARCHAR(36)');
         await safeAddColumn('certificados', 'empresa_id VARCHAR(36)');
         await safeAddColumn('certificados', 'tipo_certificado_id VARCHAR(36)');
-        await safeAddColumn('certificados', 'url_pdf_storage VARCHAR(255)');
+        await safeAddColumn('certificados', 'url_pdf_storage LONGTEXT');
         await safeAddColumn('certificados', 'alerta_90d_enviada TINYINT(1) DEFAULT 0');
         await safeAddColumn('certificados', 'alerta_30d_enviada TINYINT(1) DEFAULT 0');
         await safeAddColumn('certificados', 'alerta_10d_enviada TINYINT(1) DEFAULT 0');
         await safeAddColumn('certificados', 'fecha_ultima_alerta DATETIME NULL');
         try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN tipo_certificado_id VARCHAR(36) NULL"); } catch(e){}
-        try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN url_pdf_storage VARCHAR(255) NULL"); } catch(e){}
+        try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN url_pdf_storage LONGTEXT NULL"); } catch(e){}
         try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN pdf_filename VARCHAR(255) NULL"); } catch(e){}
         try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN codigo_qr_hash VARCHAR(100) NULL"); } catch(e){}
         try { await mysqlPool.query("ALTER TABLE certificados MODIFY COLUMN estado_vigencia VARCHAR(50) DEFAULT 'HABILITADO'"); } catch(e){}
