@@ -874,12 +874,28 @@ async function eliminarCertificado(req, res) {
 
         await runDB('DELETE FROM certificados WHERE id = ?', [id]);
 
-        // Recalcular estado del trabajador tras eliminar
+        // Si el trabajador ya no tiene más certificados asociados, eliminar al trabajador de la nómina
+        let trabajadorRemovido = false;
         if (trabajadorId) {
-            await recalcularEstadoTrabajadorBD(trabajadorId);
+            const certsRestantes = await allDB('SELECT id FROM certificados WHERE trabajador_id = ?', [trabajadorId]);
+            if (!certsRestantes || certsRestantes.length === 0) {
+                try {
+                    await runDB('DELETE FROM solicitudes_correccion WHERE trabajador_id = ?', [trabajadorId]);
+                    await runDB('DELETE FROM alertas_notificaciones WHERE trabajador_id = ?', [trabajadorId]);
+                    await runDB('DELETE FROM trabajadores WHERE id = ?', [trabajadorId]);
+                    trabajadorRemovido = true;
+                } catch(e) {}
+            } else {
+                await recalcularEstadoTrabajadorBD(trabajadorId);
+            }
         }
 
-        res.json({ exito: true, message: 'Certificado eliminado de la Base de Datos exitosamente.' });
+        res.json({ 
+            exito: true, 
+            message: trabajadorRemovido 
+                ? 'Certificado y trabajador eliminados por completo de la Base de Datos.' 
+                : 'Certificado eliminado de la Base de Datos exitosamente.' 
+        });
     } catch (err) {
         res.status(500).json({ error: 'Error eliminando certificado: ' + err.message });
     }

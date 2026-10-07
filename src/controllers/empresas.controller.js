@@ -11,7 +11,12 @@ async function listarEmpresas(req, res) {
         }
 
         const data = await Promise.all(empresas.map(async emp => {
-            const trabs = await allDB('SELECT * FROM trabajadores WHERE empresa_id = ?', [emp.id]);
+            const trabs = await allDB(`
+                SELECT t.* FROM trabajadores t
+                JOIN certificados c ON c.trabajador_id = t.id
+                WHERE t.empresa_id = ?
+                GROUP BY t.id
+            `, [emp.id]);
             const hab = trabs.filter(t => t.estado_habilitacion === 'HABILITADO').length;
             const certs = await allDB('SELECT * FROM certificados WHERE empresa_id = ?', [emp.id]);
             return {

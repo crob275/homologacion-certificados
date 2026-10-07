@@ -2647,6 +2647,30 @@ window.cerrarModalAdjuntarPDF = cerrarModalAdjuntarPDF;
 window.handleFileSelectedAdjuntoPDF = handleFileSelectedAdjuntoPDF;
 window.handleGuardarAdjuntoPDF = handleGuardarAdjuntoPDF;
 
+async function limpiarTodoHistorialDesdeUI() {
+    if (!confirm('⚠️ ¿Está seguro de limpiar todo el historial de pruebas?\n\nEsta acción eliminará todos los trabajadores, certificados y alertas registradas para comenzar desde cero de manera limpia.')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/trabajadores/limpiar-todo', {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al limpiar base de datos.');
+
+        alert('✅ ' + (data.message || 'Base de datos restablecida a 0.'));
+        loadCertificados();
+        loadDashboardKPIs();
+        loadCompanyProfiles();
+        loadAlertasLog();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+window.limpiarTodoHistorialDesdeUI = limpiarTodoHistorialDesdeUI;
+
 
 
 
