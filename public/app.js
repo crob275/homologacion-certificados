@@ -1311,6 +1311,10 @@ async function loadCertificados() {
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 <span>Editar</span>
                             </button>
+                            <a href="/api/v1/trabajadores/fotocheck/${encodeURIComponent(c.trabajador_id)}" target="_blank" class="table-btn-action" style="background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.35); color: #c084fc; text-decoration: none;" title="Imprimir Fotocheck / Carnet Minero con QR">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span>Fotocheck</span>
+                            </a>
                             <button class="table-btn-action" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;" onclick="enviarAlertaIndividualJS('${c.id}')" title="Despachar Notificación Oficial">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                                 <span>Notificar</span>
@@ -2518,12 +2522,17 @@ function renderizarKioskoEnTab(data) {
             <!-- Botones de Acción -->
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); padding: 12px; border-radius: 8px;">
                 <div>
-                    <strong style="color: #fff; font-size: 0.88rem;">¿Hay datos desactualizados o tu certificado carece de DNI?</strong>
-                    <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-secondary);">Genera una solicitud formal de corrección para auditoría HSE.</p>
+                    <strong style="color: #fff; font-size: 0.88rem;">Credencial Oficial & Solicitudes</strong>
+                    <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--text-secondary);">Descargue su fotocheck oficial con código QR o solicite corrección de datos.</p>
                 </div>
-                <button type="button" class="btn-warning" onclick="abrirModalSolicitudDesdeKiosco()" style="font-size: 0.85rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 700; border: none; border-radius: 6px; cursor: pointer;">
-                    ⚠️ Solicitar Corrección de Datos
-                </button>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a href="/api/v1/trabajadores/fotocheck/${encodeURIComponent(trab.id)}" target="_blank" class="btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #a855f7, #7e22ce); color: #fff; font-weight: 700; border: none; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                        🖨️ Imprimir Carnet / Fotocheck
+                    </a>
+                    <button type="button" class="btn-warning" onclick="abrirModalSolicitudDesdeKiosco()" style="font-size: 0.85rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-weight: 700; border: none; border-radius: 6px; cursor: pointer;">
+                        ⚠️ Solicitar Corrección
+                    </button>
+                </div>
             </div>
         </div>
     `;

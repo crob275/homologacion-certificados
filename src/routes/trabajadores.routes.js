@@ -4,6 +4,8 @@ const trabajadoresController = require('../controllers/trabajadores.controller')
 
 router.get('/', trabajadoresController.listarTrabajadores);
 router.get('/consulta-dni/:dni', trabajadoresController.consultarPorDNI);
+router.get('/verificar-qr/:dni', trabajadoresController.verificarQRPublico);
+router.get('/fotocheck/:id', trabajadoresController.generarFotocheckHTML);
 router.post('/reenviar-notificacion', trabajadoresController.reenviarNotificacionTrabajador);
 
 // Solicitudes de Corrección
