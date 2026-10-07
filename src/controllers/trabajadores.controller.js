@@ -51,7 +51,7 @@ async function crearTrabajador(req, res) {
 async function actualizarTrabajador(req, res) {
     try {
         const { id } = req.params;
-        const { empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo } = req.body;
+        const { empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, foto_perfil } = req.body;
 
         const telNorm = telefono_personal !== undefined ? normalizarTelefonoPeru(telefono_personal) : undefined;
 
@@ -66,9 +66,10 @@ async function actualizarTrabajador(req, res) {
                 telefono_personal = COALESCE(?, telefono_personal),
                 cargo_puesto = COALESCE(?, cargo_puesto),
                 area_trabajo = COALESCE(?, area_trabajo),
+                foto_perfil = COALESCE(?, foto_perfil),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `, [empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telNorm, cargo_puesto, area_trabajo, id]);
+        `, [empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telNorm, cargo_puesto, area_trabajo, foto_perfil, id]);
 
         const trabActualizado = await getDB('SELECT * FROM trabajadores WHERE id = ?', [id]);
         res.json({ message: 'Trabajador actualizado en BD.', trabajador: trabActualizado });
@@ -499,7 +500,9 @@ async function verificarQRPublico(req, res) {
                     </div>
 
                     <div class="data-card" style="text-align: center;">
-                        <div class="avatar">👷</div>
+                        <div class="avatar">
+                            ${trabajador.foto_perfil ? `<img src="${trabajador.foto_perfil}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">` : '👷'}
+                        </div>
                         <h2 style="margin: 0; font-size: 1.3rem; color: #fff;">${trabajador.nombres} ${trabajador.apellidos}</h2>
                         <div style="color: #38bdf8; font-weight: bold; font-size: 1rem; margin-top: 4px;">DNI: ${trabajador.numero_documento}</div>
                         <div style="color: #94a3b8; font-size: 0.88rem; margin-top: 4px;">Cargo: <strong style="color: #e2e8f0;">${trabajador.cargo_puesto || 'Personal Técnico'}</strong></div>
@@ -596,7 +599,7 @@ async function generarFotocheckHTML(req, res) {
                     /* Formato Estándar CR80 Fotocheck (85.6mm x 53.98mm escalado a 324px x 510px) */
                     .cr80-card { width: 310px; height: 490px; background: #090e17; border-radius: 14px; border: 2px solid #334155; position: relative; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6); display: flex; flex-direction: column; box-sizing: border-box; }
                     .card-header { background: linear-gradient(135deg, #1e293b, #0f172a); padding: 14px 16px; border-bottom: 2px solid ${badgeColor}; display: flex; justify-content: space-between; align-items: center; }
-                    .photo-box { width: 90px; height: 110px; background: #1e293b; border: 2px solid #38bdf8; border-radius: 8px; margin: 12px auto 6px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #94a3b8; }
+                    .photo-box { width: 96px; height: 116px; background: #1e293b; border: 2px solid #38bdf8; border-radius: 8px; margin: 12px auto 6px; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #94a3b8; overflow: hidden; }
                     .qr-section { background: #ffffff; padding: 6px; border-radius: 8px; display: inline-block; margin-top: 6px; }
                     @media print {
                         body { background: #fff !important; padding: 0 !important; }
@@ -622,7 +625,9 @@ async function generarFotocheckHTML(req, res) {
                             <span style="font-size: 1.4rem;">${trabajador.empresa_logo || '🏢'}</span>
                         </div>
 
-                        <div class="photo-box">👷</div>
+                        <div class="photo-box">
+                            ${trabajador.foto_perfil ? `<img src="${trabajador.foto_perfil}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;">` : '👷'}
+                        </div>
 
                         <div style="text-align: center; padding: 0 14px;">
                             <h3 style="margin: 0; font-size: 14px; color: #ffffff; text-transform: uppercase;">${trabajador.nombres}</h3>

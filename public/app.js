@@ -2019,6 +2019,32 @@ async function abrirModalEditarTrabajador(trabajadorId) {
         if (telInput) telInput.value = trab ? (trab.telefono_personal || '') : '';
         if (cargoInput) cargoInput.value = trab ? (trab.cargo_puesto || '') : '';
 
+        // Manejo de Foto de Perfil
+        const fotoBase64Input = document.getElementById('modal-trab-foto-base64');
+        const fotoImg = document.getElementById('modal-trab-foto-img');
+        const fotoPlaceholder = document.getElementById('modal-trab-foto-placeholder');
+        const btnEliminarFoto = document.getElementById('btn-eliminar-foto-perfil');
+        const fileInput = document.getElementById('modal-trab-foto-input');
+        if (fileInput) fileInput.value = '';
+
+        if (trab && trab.foto_perfil) {
+            if (fotoBase64Input) fotoBase64Input.value = trab.foto_perfil;
+            if (fotoImg) {
+                fotoImg.src = trab.foto_perfil;
+                fotoImg.style.display = 'block';
+            }
+            if (fotoPlaceholder) fotoPlaceholder.style.display = 'none';
+            if (btnEliminarFoto) btnEliminarFoto.style.display = 'inline-block';
+        } else {
+            if (fotoBase64Input) fotoBase64Input.value = '';
+            if (fotoImg) {
+                fotoImg.src = '';
+                fotoImg.style.display = 'none';
+            }
+            if (fotoPlaceholder) fotoPlaceholder.style.display = 'block';
+            if (btnEliminarFoto) btnEliminarFoto.style.display = 'none';
+        }
+
         const modal = document.getElementById('modal-editar-trabajador');
         if (modal) {
             modal.style.display = 'flex';
@@ -2028,6 +2054,79 @@ async function abrirModalEditarTrabajador(trabajadorId) {
         console.error('Error abriendo modal de edición:', err);
         alert('Error cargando datos del empleado: ' + err.message);
     }
+}
+
+function handleFotoSeleccionada(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        return alert('Por favor seleccione un archivo de imagen válido (JPG, PNG).');
+    }
+
+    // Comprimir / redimensionar imagen en el cliente para máxima velocidad (máx 400x500px)
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 400;
+            const MAX_HEIGHT = 500;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+            const fotoBase64Input = document.getElementById('modal-trab-foto-base64');
+            const fotoImg = document.getElementById('modal-trab-foto-img');
+            const fotoPlaceholder = document.getElementById('modal-trab-foto-placeholder');
+            const btnEliminarFoto = document.getElementById('btn-eliminar-foto-perfil');
+
+            if (fotoBase64Input) fotoBase64Input.value = compressedBase64;
+            if (fotoImg) {
+                fotoImg.src = compressedBase64;
+                fotoImg.style.display = 'block';
+            }
+            if (fotoPlaceholder) fotoPlaceholder.style.display = 'none';
+            if (btnEliminarFoto) btnEliminarFoto.style.display = 'inline-block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removerFotoPerfil() {
+    const fotoBase64Input = document.getElementById('modal-trab-foto-base64');
+    const fotoImg = document.getElementById('modal-trab-foto-img');
+    const fotoPlaceholder = document.getElementById('modal-trab-foto-placeholder');
+    const btnEliminarFoto = document.getElementById('btn-eliminar-foto-perfil');
+    const fileInput = document.getElementById('modal-trab-foto-input');
+
+    if (fotoBase64Input) fotoBase64Input.value = '';
+    if (fileInput) fileInput.value = '';
+    if (fotoImg) {
+        fotoImg.src = '';
+        fotoImg.style.display = 'none';
+    }
+    if (fotoPlaceholder) fotoPlaceholder.style.display = 'block';
+    if (btnEliminarFoto) btnEliminarFoto.style.display = 'none';
 }
 
 function closeEditTrabajadorModal() {
@@ -2046,7 +2145,8 @@ async function handleSaveTrabajadorEdit(e) {
         numero_documento: document.getElementById('modal-trab-doc').value.trim(),
         email_personal: document.getElementById('modal-trab-email').value.trim(),
         telefono_personal: document.getElementById('modal-trab-telefono').value.trim(),
-        cargo_puesto: document.getElementById('modal-trab-cargo').value.trim()
+        cargo_puesto: document.getElementById('modal-trab-cargo').value.trim(),
+        foto_perfil: document.getElementById('modal-trab-foto-base64') ? document.getElementById('modal-trab-foto-base64').value : null
     };
 
     try {
@@ -2059,7 +2159,7 @@ async function handleSaveTrabajadorEdit(e) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al actualizar empleado.');
 
-        alert('¡Datos del empleado actualizados exitosamente en la Base de Datos!');
+        alert('¡Datos y foto del empleado actualizados exitosamente en la Base de Datos!');
         closeEditTrabajadorModal();
         loadCertificados();
         loadDashboardKPIs();
@@ -2128,6 +2228,8 @@ window.cerrarVisorPDF = cerrarVisorPDF;
 window.abrirModalEditarTrabajador = abrirModalEditarTrabajador;
 window.closeEditTrabajadorModal = closeEditTrabajadorModal;
 window.handleSaveTrabajadorEdit = handleSaveTrabajadorEdit;
+window.handleFotoSeleccionada = handleFotoSeleccionada;
+window.removerFotoPerfil = removerFotoPerfil;
 window.eliminarCertificadoJS = eliminarCertificadoJS;
 
 // =========================================================================

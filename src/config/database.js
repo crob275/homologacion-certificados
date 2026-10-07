@@ -465,6 +465,7 @@ async function setupMySQLSchemaAndSeeds() {
         await safeAddColumn('trabajadores', 'area_trabajo VARCHAR(100)');
         await safeAddColumn('trabajadores', "estado_habilitacion ENUM('HABILITADO', 'PROXIMO_A_VENCER', 'INHABILITADO') DEFAULT 'INHABILITADO'");
         await safeAddColumn('trabajadores', 'motivo_inhabilitacion TEXT');
+        await safeAddColumn('trabajadores', 'foto_perfil LONGTEXT');
 
         await safeAddColumn('certificados', 'trabajador_id VARCHAR(36)');
         await safeAddColumn('certificados', 'empresa_id VARCHAR(36)');
