@@ -916,6 +916,115 @@ async function actualizarCertificado(req, res) {
     }
 }
 
+// =========================================================================
+// MÓDULO DE REGULARIZACIÓN AUDITABLE (80% -> 100% HOMOLOGADO)
+// Permite adjuntar el archivo PDF original escaneado a un registro previo
+// (como los cargados por planilla Excel), realizando validación OCR de coincidencia.
+// =========================================================================
+async function adjuntarSustentoPDF(req, res) {
+    try {
+        const { id } = req.params;
+        if (!req.file) {
+            return res.status(400).json({ error: 'Debe seleccionar un archivo PDF para adjuntar como sustento.' });
+        }
+
+        const cert = await getDB(`
+            SELECT c.*, 
+                   t.nombres AS trab_nombres, t.apellidos AS trab_apellidos, t.numero_documento AS trab_doc,
+                   t.email_personal AS trab_email, t.cargo_puesto AS trab_cargo,
+                   e.razon_social AS emp_nombre, e.email_contacto AS emp_email
+            FROM certificados c
+            JOIN trabajadores t ON c.trabajador_id = t.id
+            JOIN empresas e ON c.empresa_id = e.id
+            WHERE c.id = ?
+        `, [id]);
+
+        if (!cert) {
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Certificado no encontrado en la base de datos.' });
+        }
+
+        const pdfBuffer = fs.readFileSync(req.file.path);
+        const originalName = req.file.originalname || 'certificado_adjuntado.pdf';
+        const serverFilename = req.file.filename;
+
+        // 1. Análisis OCR Inteligente para comprobación de autenticidad documental
+        let ocrInfo = { coincidenciaDoc: false, coincidenciaNombre: false, advertencias: [] };
+        try {
+            const extracted = await extraerMetadatosRealPDF(pdfBuffer, originalName);
+            if (extracted.dniTrabajador && cert.trab_doc && !cert.trab_doc.startsWith('TEMP_')) {
+                ocrInfo.coincidenciaDoc = extracted.dniTrabajador.trim() === cert.trab_doc.trim();
+                if (!ocrInfo.coincidenciaDoc) {
+                    ocrInfo.advertencias.push(`El DNI detectado en el PDF (${extracted.dniTrabajador}) no coincide con el DNI del expediente (${cert.trab_doc}).`);
+                }
+            }
+
+            const nombreCompletoExpediente = `${cert.trab_nombres} ${cert.trab_apellidos}`.toLowerCase();
+            const nombreExtraidoPDF = (extracted.nombreTrabajador || '').toLowerCase().trim();
+            if (nombreExtraidoPDF.length > 4 && !nombreExtraidoPDF.includes('trabajador acreditado')) {
+                const palabras = nombreExtraidoPDF.split(/\s+/).filter(p => p.length > 2);
+                const coincidencias = palabras.filter(p => nombreCompletoExpediente.includes(p));
+                ocrInfo.coincidenciaNombre = coincidencias.length >= 1;
+                if (!ocrInfo.coincidenciaNombre) {
+                    ocrInfo.advertencias.push(`El nombre impreso en el PDF ("${extracted.nombreTrabajador}") difiere del trabajador registrado.`);
+                }
+            }
+        } catch (ocrErr) {
+            console.warn('⚠️ OCR preliminar no concluyente, procediendo con adjunto:', ocrErr.message);
+        }
+
+        // 2. Persistencia en MySQL (Cloud LONGTEXT)
+        const pdfBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
+
+        await runDB(`
+            UPDATE certificados SET
+                pdf_filename = ?,
+                url_pdf_storage = ?,
+                estado_validacion = 'APROBADO',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `, [serverFilename, pdfBase64, id]);
+
+        // 3. Recalcular estado del trabajador
+        await recalcularEstadoTrabajadorBD(cert.trabajador_id);
+
+        // 4. Notificar por Correo Electrónico que el expediente ha sido regularizado al 100%
+        let notificacionEnviada = false;
+        try {
+            const remitenteSesion = req.body.usuario_nombre ? {
+                nombre_completo: req.body.usuario_nombre,
+                rol: req.body.usuario_rol || 'AUDITORÍA HSE',
+                email: req.body.usuario_email || cert.emp_email
+            } : null;
+
+            await enviarNotificacionIndividualTrabajador({
+                certificadoId: id,
+                remitente: remitenteSesion,
+                remitenteNombre: req.body.usuario_nombre || 'Auditoría HomologaControl',
+                remitenteRol: req.body.usuario_rol || 'AUDITORÍA HSE',
+                remitenteEmail: req.body.usuario_email || cert.emp_email
+            });
+            notificacionEnviada = true;
+        } catch (mailErr) {
+            console.warn('⚠️ Error enviando correo de confirmación 100%:', mailErr.message);
+        }
+
+        const certActualizado = await getDB('SELECT * FROM certificados WHERE id = ?', [id]);
+
+        res.json({
+            exito: true,
+            message: `¡SUSTENTO DIGITAL ADJUNTADO CON ÉXITO! El certificado de "${cert.trab_nombres} ${cert.trab_apellidos}" ahora cuenta con sustento PDF oficial al 100%.`,
+            certificado: certActualizado,
+            ocr_analisis: ocrInfo,
+            correo_notificado: notificacionEnviada
+        });
+
+    } catch (err) {
+        console.error('Error adjuntando sustento PDF:', err);
+        res.status(500).json({ error: 'Error adjuntando archivo PDF: ' + err.message });
+    }
+}
+
 module.exports = {
     listarCertificados,
     servirArchivoPDF,
@@ -925,5 +1034,7 @@ module.exports = {
     evaluarHomologacion,
     descargarPlantillaExcel,
     eliminarCertificado,
-    actualizarCertificado
+    actualizarCertificado,
+    adjuntarSustentoPDF
 };
+

@@ -1270,7 +1270,10 @@ async function loadCertificados() {
                 badgeVigencia = `<span class="badge badge-success">✓ APTO (${diasRestantes}d restantes)</span>`;
             }
 
-            const badgeAudit = `<span class="badge ${c.estado_validacion === 'APROBADO' ? 'badge-success' : (c.estado_validacion === 'RECHAZADO' ? 'badge-danger' : 'badge-warning')}">${c.estado_validacion}</span>`;
+            const tienePDFReal = Boolean(c.url_pdf_storage || (c.pdf_filename && !c.pdf_filename.includes('Excel')));
+            const badgeAudit = tienePDFReal 
+                ? `<span class="badge ${c.estado_validacion === 'APROBADO' ? 'badge-success' : (c.estado_validacion === 'RECHAZADO' ? 'badge-danger' : 'badge-warning')}">${c.estado_validacion}</span>`
+                : `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);" title="Expediente con 80% completado. Falta adjuntar archivo PDF escaneado.">⚠️ 80% PROVISIONAL</span>`;
 
             return `
                 <tr>
@@ -1293,12 +1296,17 @@ async function loadCertificados() {
                     <td>${badgeVigencia}</td>
                     <td>
                         <div class="table-btn-group">
-                            ${c.pdf_filename ? `
+                            ${tienePDFReal ? `
                             <button class="table-btn-action" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || c.curso || 'Certificado').replace(/'/g, "\\'")}', '${(c.trabajador_nombre || '').replace(/'/g, "\\'")}')" title="Ver Certificado PDF Original">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                 <span>PDF</span>
                             </button>
-                            ` : ''}
+                            ` : `
+                            <button class="table-btn-action" style="background: rgba(245, 158, 11, 0.2); border-color: #f59e0b; color: #fbbf24;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(c.trabajador_nombre || '').replace(/'/g, "\\'")}', '${c.trabajador_doc || ''}', '${(c.nombre_curso || c.curso || '').replace(/'/g, "\\'")}')" title="Completar Expediente: Adjuntar Escaneado PDF Original">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                <span>📎 Adjuntar PDF</span>
+                            </button>
+                            `}
                             <button class="table-btn-action table-btn-edit" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" title="Editar Información del Empleado">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 <span>Editar</span>
@@ -2537,6 +2545,107 @@ function descargarPadronFiltrado() {
 }
 
 window.descargarPadronFiltrado = descargarPadronFiltrado;
+
+// =========================================================================
+// GESTIÓN DEL MODAL PARA ADJUNTAR SUSTENTO DIGITAL PDF (80% -> 100%)
+// =========================================================================
+function abrirModalAdjuntarPDF(certId, trabNombre, trabDoc, cursoNombre) {
+    document.getElementById('adjunto-cert-id').value = certId;
+    document.getElementById('adjunto-trab-nombre').textContent = trabNombre || 'Personal Minero';
+    document.getElementById('adjunto-trab-doc').textContent = trabDoc ? `(Doc: ${trabDoc})` : '';
+    document.getElementById('adjunto-cert-curso').textContent = cursoNombre || 'Certificado de Homologación';
+
+    // Resetear dropzone y archivo
+    const fileInput = document.getElementById('input-file-adjunto-pdf');
+    if (fileInput) fileInput.value = '';
+    const labelPreview = document.getElementById('adjunto-pdf-filename-preview');
+    if (labelPreview) labelPreview.textContent = 'Ningún archivo seleccionado';
+    const statusBox = document.getElementById('adjunto-status-alert');
+    if (statusBox) statusBox.style.display = 'none';
+
+    document.getElementById('modal-adjuntar-pdf').style.display = 'flex';
+}
+
+function cerrarModalAdjuntarPDF() {
+    document.getElementById('modal-adjuntar-pdf').style.display = 'none';
+}
+
+function handleFileSelectedAdjuntoPDF() {
+    const fileInput = document.getElementById('input-file-adjunto-pdf');
+    const labelPreview = document.getElementById('adjunto-pdf-filename-preview');
+    if (fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        labelPreview.textContent = `📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    } else {
+        labelPreview.textContent = 'Ningún archivo seleccionado';
+    }
+}
+
+async function handleGuardarAdjuntoPDF(e) {
+    e.preventDefault();
+    const certId = document.getElementById('adjunto-cert-id').value;
+    const fileInput = document.getElementById('input-file-adjunto-pdf');
+    const statusBox = document.getElementById('adjunto-status-alert');
+    const btnSubmit = document.getElementById('btn-submit-adjuntar-pdf');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Por favor seleccione el archivo PDF del diploma escaneado.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('pdfFile', fileInput.files[0]);
+
+    if (usuarioSesionActivo) {
+        formData.append('usuario_id', usuarioSesionActivo.id);
+        formData.append('usuario_nombre', usuarioSesionActivo.nombre_completo);
+        formData.append('usuario_rol', usuarioSesionActivo.rol);
+        formData.append('usuario_email', usuarioSesionActivo.email);
+    }
+
+    try {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span>⏳ Procesando y Validando OCR...</span>';
+        statusBox.style.display = 'none';
+
+        const res = await fetch(`/api/v1/certificados/${certId}/adjuntar-pdf`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+            throw new Error(result.error || 'Error al adjuntar sustento PDF');
+        }
+
+        // Mostrar advertencias de OCR si existen o éxito total
+        let mensaje = result.message || 'Sustento PDF adjuntado correctamente.';
+        if (result.ocr_analisis && result.ocr_analisis.advertencias && result.ocr_analisis.advertencias.length > 0) {
+            mensaje += '\n\n⚠️ NOTAS DE AUDITORÍA OCR:\n' + result.ocr_analisis.advertencias.join('\n');
+        }
+
+        alert(mensaje);
+        cerrarModalAdjuntarPDF();
+        loadCertificados();
+        loadDashboardKPIs();
+        loadAlertasLog();
+
+    } catch (err) {
+        statusBox.style.display = 'block';
+        statusBox.style.background = 'rgba(239, 68, 68, 0.2)';
+        statusBox.style.color = '#fca5a5';
+        statusBox.style.border = '1px solid #ef4444';
+        statusBox.textContent = '❌ ' + err.message;
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span>📎 Cargar y Acreditar al 100%</span>';
+    }
+}
+
+window.abrirModalAdjuntarPDF = abrirModalAdjuntarPDF;
+window.cerrarModalAdjuntarPDF = cerrarModalAdjuntarPDF;
+window.handleFileSelectedAdjuntoPDF = handleFileSelectedAdjuntoPDF;
+window.handleGuardarAdjuntoPDF = handleGuardarAdjuntoPDF;
 
 
 

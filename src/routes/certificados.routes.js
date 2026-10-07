@@ -9,6 +9,7 @@ router.post('/upload', upload.single('pdfFile'), certificadosController.uploadPD
 router.post('/upload-batch', upload.array('pdfFiles', 50), certificadosController.uploadBatchPDFOCR);
 router.post('/carga-masiva-excel', upload.single('excelFile'), certificadosController.cargarMasivaExcel);
 router.put('/:id', certificadosController.actualizarCertificado);
+router.post('/:id/adjuntar-pdf', upload.single('pdfFile'), certificadosController.adjuntarSustentoPDF);
 router.delete('/:id', certificadosController.eliminarCertificado);
 
 module.exports = router;
