@@ -85,17 +85,20 @@ async function uploadPDFOCR(req, res) {
 
         if (!trabajador) {
             const nuevoId = 'tr-' + Date.now();
-            const nuevoDoc = dniExtraido ? extracted.dniTrabajador : String(Math.floor(Math.random() * 89999999 + 10000000));
+            const nuevoDoc = dniExtraido ? extracted.dniTrabajador : ('TEMP_' + Math.floor(Math.random() * 899999 + 100000));
             let nombres = '';
             let apellidos = '';
             let emailPersonal = '';
+            let cargoFinal = 'Pendiente de Asignación';
+            let areaFinal = null;
 
             if (usuarioSistemaMatch) {
-                // Adoptar datos oficiales del usuario
+                // Adoptar datos oficiales del usuario registrado
                 const partes = usuarioSistemaMatch.nombre_completo.trim().split(/\s+/);
                 nombres = partes.slice(0, 2).join(' ');
                 apellidos = partes.slice(2).join(' ') || partes[1] || '';
                 emailPersonal = usuarioSistemaMatch.email;
+                cargoFinal = usuarioSistemaMatch.cargo || 'Pendiente de Asignación';
             } else {
                 const nombreLimpio = extracted.nombreTrabajador.trim();
                 const partes = nombreLimpio.split(/\s+/);
@@ -110,9 +113,9 @@ async function uploadPDFOCR(req, res) {
             }
 
             await runDB(`
-                INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, estado_habilitacion)
-                VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, 'Técnico Especialista en Mantenimiento', 'INHABILITADO')
-            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, emailPersonal, '+51 987654321']);
+                INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, estado_habilitacion)
+                VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, ?, ?, 'INHABILITADO')
+            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, emailPersonal, '+51 987654321', cargoFinal, areaFinal]);
 
             trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
             esNuevoTrabajador = true;
@@ -134,9 +137,9 @@ async function uploadPDFOCR(req, res) {
             [trabajador.id, extracted.nombreCurso, filename]
         );
 
-        // Almacenar respaldo en Base64 en la base de datos (url_pdf_storage) para que sobreviva a reinicios en la nube (Railway)
+        // Almacenar respaldo en Base64 en la base de datos (url_pdf_storage) para que sobreviva permanentemente en la nube
         let pdfBase64 = null;
-        if (pdfBuffer && pdfBuffer.length > 0 && pdfBuffer.length < 8 * 1024 * 1024) {
+        if (pdfBuffer && pdfBuffer.length > 0) {
             pdfBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
         }
 
@@ -286,11 +289,15 @@ async function uploadBatchPDFOCR(req, res) {
                     let apellidos = '';
                     let emailPersonal = '';
 
+                    let cargoPuestoFinal = 'Pendiente de Asignación';
+                    let areaTrabajoFinal = null;
+
                     if (usuarioMatch) {
                         const partes = usuarioMatch.nombre_completo.trim().split(/\s+/);
                         nombres = partes.slice(0, 2).join(' ');
                         apellidos = partes.slice(2).join(' ') || partes[1] || '';
                         emailPersonal = usuarioMatch.email;
+                        cargoPuestoFinal = usuarioMatch.cargo || 'Pendiente de Asignación';
                     } else {
                         const partes = extracted.nombreTrabajador.trim().split(/\s+/);
                         nombres = partes[0] || 'Operario';
@@ -298,10 +305,14 @@ async function uploadBatchPDFOCR(req, res) {
                         emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
                     }
 
+                    const docFinal = (extracted.dniTrabajador && extracted.dniTrabajador.length === 8) 
+                        ? extracted.dniTrabajador 
+                        : ('TEMP_' + Math.floor(Math.random() * 899999 + 100000));
+
                     await runDB(`
-                        INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, estado_habilitacion)
-                        VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, 'Técnico Especialista en Mantenimiento', 'INHABILITADO')
-                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, emailPersonal, '+51 987654321']);
+                        INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, estado_habilitacion)
+                        VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, ?, ?, 'INHABILITADO')
+                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, emailPersonal, '+51 987654321', cargoPuestoFinal, areaTrabajoFinal]);
 
                     trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
                     esNuevoTrabajador = true;
@@ -316,7 +327,7 @@ async function uploadBatchPDFOCR(req, res) {
                 );
 
                 let batchBase64 = null;
-                if (pdfBuffer && pdfBuffer.length > 0 && pdfBuffer.length < 8 * 1024 * 1024) {
+                if (pdfBuffer && pdfBuffer.length > 0) {
                     batchBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
                 }
 

@@ -700,7 +700,28 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
     let tituloBanner = '¡TIENES PASE AUTORIZADO PARA PLANTA!';
     let explicacionHTML = '';
 
-    if (diasRestantes <= 0) {
+    const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
+    const faltaDatos = dniEsTemporal || !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
+
+    if (faltaDatos) {
+        estadoKey = 'PENDIENTE_REGULARIZAR';
+        estadoLabel = '⚠️ REGISTRO PROVISIONAL (80% COMPLETADO)';
+        bannerGrad = 'linear-gradient(135deg, #d97706, #b45309)';
+        colorTextoBanner = '#ffffff';
+        iconoBanner = '📝';
+        tituloBanner = 'CERTIFICADO REGISTRADO - REQUIERE REGULARIZAR DATOS';
+        explicacionHTML = `
+            <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
+                <strong style="color: #fde68a; display: block; margin-bottom: 4px;">⚠️ ACCIÓN OBLIGATORIA DE REGULARIZACIÓN (AUDITORÍA HSE):</strong>
+                Tu certificado para <strong>${certificado.nombre_curso}</strong> ha sido cargado con éxito en la plataforma, pero <strong>faltan datos reglamentarios indispensables</strong> para emitir tu pase definitivo de ingreso a mina:<br>
+                <ul>
+                    ${dniEsTemporal ? '<li><strong>Falta DNI oficial:</strong> El PDF no contiene tu número de documento legible. Se asignó un identificador provisional (' + trabajador.numero_documento + ').</li>' : ''}
+                    ${(!trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente')) ? '<li><strong>Cargo / Área no asignada:</strong> Tu perfil figura como "Pendiente de Asignación".</li>' : ''}
+                </ul>
+                👉 <strong>¿Qué debes hacer?:</strong> Ingresa a la plataforma y usa el botón <code>[ ⚠️ Solicitar Corrección de Datos ]</code> o contacta a <strong>${remitenteNombre}</strong> (${remitenteRol}) para vincular tu DNI y cargo oficial.
+            </div>
+        `;
+    } else if (diasRestantes <= 0) {
         estadoKey = 'VENCIDO';
         estadoLabel = '⛔ NO APTO (VENCIDO)';
         bannerGrad = 'linear-gradient(135deg, #be123c, #e11d48)';
@@ -781,13 +802,76 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
 }
 
 // Enviar notificación a 1 trabajador individual
-async function enviarNotificacionIndividualTrabajador({ trabajador, certificado, empresa, remitente, diasRestantes }) {
-    const remitenteNombre = (remitente && remitente.nombre_completo) ? remitente.nombre_completo : 'Operador de Homologaciones';
-    const remitenteRol = (remitente && remitente.rol) ? remitente.rol : 'OPERADOR HSE';
-    const remitenteEmail = (remitente && remitente.email) ? remitente.email : (empresa.email_contacto || 'contacto@empresa.com');
+async function enviarNotificacionIndividualTrabajador(params) {
+    let { trabajador, certificado, empresa, remitente, diasRestantes, certificadoId } = params;
+
+    // Si viene solo certificadoId, hidratar desde la BD
+    if (certificadoId && (!trabajador || !certificado)) {
+        const cert = await getDB(`
+            SELECT c.*, 
+                   t.id AS trab_id, t.nombres AS trab_nombres, t.apellidos AS trab_apellidos, 
+                   t.numero_documento AS trab_doc, t.email_personal AS trab_email, t.telefono_personal AS trab_telefono,
+                   t.cargo_puesto AS trab_cargo, t.area_trabajo AS trab_area,
+                   e.id AS emp_id, e.razon_social AS emp_nombre, e.email_contacto AS emp_email
+            FROM certificados c
+            JOIN trabajadores t ON c.trabajador_id = t.id
+            JOIN empresas e ON c.empresa_id = e.id
+            WHERE c.id = ?
+        `, [certificadoId]);
+
+        if (cert) {
+            trabajador = {
+                id: cert.trab_id,
+                nombres: cert.trab_nombres,
+                apellidos: cert.trab_apellidos,
+                numero_documento: cert.trab_doc,
+                email_personal: cert.trab_email,
+                telefono_personal: cert.trab_telefono,
+                cargo_puesto: cert.trab_cargo,
+                area_trabajo: cert.trab_area
+            };
+            certificado = {
+                id: cert.id,
+                nombre_curso: cert.nombre_curso,
+                entidad_emisora: cert.entidad_emisora,
+                horas_lectivas: cert.horas_lectivas,
+                fecha_emision: cert.fecha_emision,
+                fecha_vencimiento: cert.fecha_vencimiento,
+                codigo_qr_hash: cert.codigo_qr_hash
+            };
+            empresa = {
+                id: cert.emp_id,
+                razon_social: cert.emp_nombre,
+                email_contacto: cert.emp_email
+            };
+            const ahora = new Date();
+            const fVenc = new Date(cert.fecha_vencimiento);
+            diasRestantes = Math.ceil((fVenc.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24));
+        }
+    }
+
+    if (!trabajador || !certificado || !empresa) {
+        console.warn('⚠️ [NOTIFICACIÓN TRABAJADOR]: Faltan entidades para despachar el correo.');
+        return null;
+    }
+
+    const remitenteNombre = (remitente && remitente.nombre_completo) ? remitente.nombre_completo : (params.remitenteNombre || 'Auditoría HomologaControl');
+    const remitenteRol = (remitente && remitente.rol) ? remitente.rol : (params.remitenteRol || 'AUDITORÍA HSE');
+    const remitenteEmail = (remitente && remitente.email) ? remitente.email : (params.remitenteEmail || empresa.email_contacto || 'admin@ingemant.pe');
+
+    if (diasRestantes === undefined || diasRestantes === null) {
+        const ahora = new Date();
+        const fVenc = new Date(certificado.fecha_vencimiento);
+        diasRestantes = Math.ceil((fVenc.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
+    const faltaDatos = dniEsTemporal || !trabajador.cargo_puesto || trabajador.cargo_puesto === 'Pendiente de Definición';
 
     let asunto = '';
-    if (diasRestantes <= 0) {
+    if (faltaDatos) {
+        asunto = `⚠️ [REGISTRO PROVISIONAL 80%] Certificado de ${certificado.nombre_curso} - Faltan Datos por Regularizar (${trabajador.nombres} ${trabajador.apellidos})`;
+    } else if (diasRestantes <= 0) {
         asunto = `⛔ [ACCESO DENEGADO] Certificado Vencido de ${certificado.nombre_curso} - Pase Inhabilitado en Garita`;
     } else if (diasRestantes <= 90) {
         asunto = `⚠️ [AVISO PREVENTIVO] Tu Certificado de ${certificado.nombre_curso} vence en ${diasRestantes} días - Coordina Recertificación`;
