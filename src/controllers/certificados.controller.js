@@ -284,7 +284,6 @@ async function uploadBatchPDFOCR(req, res) {
                 let esNuevoTrabajador = false;
                 if (!trabajador) {
                     const nuevoId = 'tr-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-                    const docFinal = extracted.dniTrabajador || String(Math.floor(Math.random() * 89999999 + 10000000));
                     let nombres = '';
                     let apellidos = '';
                     let emailPersonal = '';
