@@ -109,7 +109,8 @@ async function uploadPDFOCR(req, res) {
                     nombres = partes.slice(0, 2).join(' ');
                     apellidos = partes.slice(2).join(' ');
                 }
-                emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
+                // Si el certificado PDF contiene un correo real, usarlo; de lo contrario NULL (no inventar correos)
+                emailPersonal = extracted.emailTrabajador || null;
             }
 
             const telefonoInicial = extracted.telefonoTrabajador || null;
@@ -173,17 +174,19 @@ async function uploadPDFOCR(req, res) {
         await recalcularEstadoTrabajadorBD(trabajador.id);
         const certificadoCreado = await getDB('SELECT * FROM certificados WHERE id = ?', [newCertId]);
 
-        // Disparar de inmediato la notificación oficial al correo del trabajador
+        // Disparar la notificación oficial solo si el trabajador tiene un correo registrado
         let envioEmailResultado = null;
-        try {
-            envioEmailResultado = await enviarNotificacionIndividualTrabajador({
-                certificadoId: newCertId,
-                remitenteNombre: 'Centro de Acreditación Digital Minera',
-                remitenteRol: 'AUDITORÍA HSE',
-                remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
-            });
-        } catch (mailErr) {
-            console.warn('⚠️ No se pudo despachar el correo inmediato de PDF:', mailErr.message);
+        if (trabajador.email_personal) {
+            try {
+                envioEmailResultado = await enviarNotificacionIndividualTrabajador({
+                    certificadoId: newCertId,
+                    remitenteNombre: 'Centro de Acreditación Digital Minera',
+                    remitenteRol: 'AUDITORÍA HSE',
+                    remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
+                });
+            } catch (mailErr) {
+                console.warn('⚠️ No se pudo despachar el correo inmediato de PDF:', mailErr.message);
+            }
         }
 
         res.status(201).json({
@@ -304,7 +307,8 @@ async function uploadBatchPDFOCR(req, res) {
                         const partes = extracted.nombreTrabajador.trim().split(/\s+/);
                         nombres = partes[0] || 'Operario';
                         apellidos = partes.slice(1).join(' ') || 'General';
-                        emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
+                        // Si el certificado PDF contiene un correo real, usarlo; de lo contrario NULL
+                        emailPersonal = extracted.emailTrabajador || null;
                     }
 
                     const docFinal = (extracted.dniTrabajador && extracted.dniTrabajador.length === 8) 
@@ -364,18 +368,20 @@ async function uploadBatchPDFOCR(req, res) {
 
                 await recalcularEstadoTrabajadorBD(trabajador.id);
 
-                // Enviar notificación oficial a cada trabajador procesado en el lote
+                // Enviar notificación oficial a cada trabajador procesado en el lote (si tiene correo)
                 let correoEnviado = false;
-                try {
-                    await enviarNotificacionIndividualTrabajador({
-                        certificadoId: certId,
-                        remitenteNombre: 'Centro de Acreditación Digital Minera',
-                        remitenteRol: 'AUDITORÍA HSE',
-                        remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
-                    });
-                    correoEnviado = true;
-                } catch (batchMailErr) {
-                    console.warn(`⚠️ Error enviando correo a ${trabajador.email_personal}:`, batchMailErr.message);
+                if (trabajador.email_personal) {
+                    try {
+                        await enviarNotificacionIndividualTrabajador({
+                            certificadoId: certId,
+                            remitenteNombre: 'Centro de Acreditación Digital Minera',
+                            remitenteRol: 'AUDITORÍA HSE',
+                            remitenteEmail: empresa.email_contacto || 'admin@ingemant.pe'
+                        });
+                        correoEnviado = true;
+                    } catch (batchMailErr) {
+                        console.warn(`⚠️ Error enviando correo a ${trabajador.email_personal}:`, batchMailErr.message);
+                    }
                 }
 
                 const careceDNI = !extracted.dniTrabajador || extracted.dniTrabajador.length !== 8;

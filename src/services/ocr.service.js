@@ -307,10 +307,18 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         telefonoTrabajador = `+51 ${matchTel[1]}`;
     }
 
+    // 8. Extraer Correo Electrónico si figura en el documento
+    let emailTrabajador = null;
+    const matchEmail = text.match(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
+    if (matchEmail && matchEmail[1] && !matchEmail[1].toLowerCase().includes('tcpdf') && !matchEmail[1].toLowerCase().includes('example.com')) {
+        emailTrabajador = matchEmail[1].toLowerCase();
+    }
+
     return { 
         dniTrabajador, 
         nombreTrabajador, 
         telefonoTrabajador,
+        emailTrabajador,
         nombreCurso, 
         entidad, 
         horas, 
