@@ -229,6 +229,8 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         nombreCurso = 'Seguridad en Trabajos en Caliente (PETAR)';
     } else if (upperText.includes('MATERIALES PELIGROSOS') || upperText.includes('MATPEL')) {
         nombreCurso = 'Manejo de Materiales Peligrosos (MATPEL)';
+    } else if (upperText.includes('HERRAMIENTAS MANUALES') || upperText.includes('HERRAMIENTAS MANUALES Y DE PODER')) {
+        nombreCurso = 'Seguridad en Herramientas Manuales y de Poder';
     } else if (upperText.includes('IPERC') || upperText.includes('IDENTIFICACION DE PELIGROS') || upperText.includes('IDENTIFICACIÓN DE PELIGROS')) {
         nombreCurso = 'IPERC Continuo y Gestión de Riesgos Mineros';
     } else if (upperText.includes('IZAJE') || upperText.includes('RIGGER') || upperText.includes('GRÚA') || upperText.includes('GRUA')) {
