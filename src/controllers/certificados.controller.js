@@ -88,31 +88,22 @@ async function uploadPDFOCR(req, res) {
             const nuevoDoc = dniExtraido ? extracted.dniTrabajador : ('TEMP_' + Math.floor(Math.random() * 899999 + 100000));
             let nombres = '';
             let apellidos = '';
-            let emailPersonal = '';
             let cargoFinal = 'Pendiente de Asignación';
             let areaFinal = null;
 
-            if (usuarioSistemaMatch) {
-                // Adoptar datos oficiales del usuario registrado
-                const partes = usuarioSistemaMatch.nombre_completo.trim().split(/\s+/);
-                nombres = partes.slice(0, 2).join(' ');
-                apellidos = partes.slice(2).join(' ') || partes[1] || '';
-                emailPersonal = usuarioSistemaMatch.email;
-                cargoFinal = usuarioSistemaMatch.cargo || 'Pendiente de Asignación';
+            const nombreLimpio = extracted.nombreTrabajador.trim();
+            const partes = nombreLimpio.split(/\s+/);
+            if (partes.length <= 2) {
+                nombres = partes[0] || 'Operario';
+                apellidos = partes[1] || 'General';
             } else {
-                const nombreLimpio = extracted.nombreTrabajador.trim();
-                const partes = nombreLimpio.split(/\s+/);
-                if (partes.length <= 2) {
-                    nombres = partes[0] || 'Operario';
-                    apellidos = partes[1] || 'General';
-                } else {
-                    nombres = partes.slice(0, 2).join(' ');
-                    apellidos = partes.slice(2).join(' ');
-                }
-                // Si el certificado PDF contiene un correo real, usarlo; de lo contrario NULL (no inventar correos)
-                emailPersonal = extracted.emailTrabajador || null;
+                nombres = partes.slice(0, 2).join(' ');
+                apellidos = partes.slice(2).join(' ');
             }
 
+            // Solo usar el correo si vino impreso en el certificado del trabajador.
+            // NUNCA inventar correos ni copiar el correo de la cuenta de administrador.
+            const emailPersonal = extracted.emailTrabajador || null;
             const telefonoInicial = extracted.telefonoTrabajador || null;
 
             await runDB(`
@@ -297,19 +288,11 @@ async function uploadBatchPDFOCR(req, res) {
                     let cargoPuestoFinal = 'Pendiente de Asignación';
                     let areaTrabajoFinal = null;
 
-                    if (usuarioMatch) {
-                        const partes = usuarioMatch.nombre_completo.trim().split(/\s+/);
-                        nombres = partes.slice(0, 2).join(' ');
-                        apellidos = partes.slice(2).join(' ') || partes[1] || '';
-                        emailPersonal = usuarioMatch.email;
-                        cargoPuestoFinal = usuarioMatch.cargo || 'Pendiente de Asignación';
-                    } else {
-                        const partes = extracted.nombreTrabajador.trim().split(/\s+/);
-                        nombres = partes[0] || 'Operario';
-                        apellidos = partes.slice(1).join(' ') || 'General';
-                        // Si el certificado PDF contiene un correo real, usarlo; de lo contrario NULL
-                        emailPersonal = extracted.emailTrabajador || null;
-                    }
+                    const partes = extracted.nombreTrabajador.trim().split(/\s+/);
+                    nombres = partes[0] || 'Operario';
+                    apellidos = partes.slice(1).join(' ') || 'General';
+                    // Solo usar el correo si vino impreso en el documento del trabajador (no inventar ni heredar)
+                    emailPersonal = extracted.emailTrabajador || null;
 
                     const docFinal = (extracted.dniTrabajador && extracted.dniTrabajador.length === 8) 
                         ? extracted.dniTrabajador 
