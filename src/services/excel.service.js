@@ -52,10 +52,11 @@ function calcularFechaVencimiento(fechaEmisionInput) {
 }
 
 function normalizarTelefonoPeru(phoneInput) {
-    if (!phoneInput) return '+51 900000000';
+    if (!phoneInput) return '';
     let str = String(phoneInput).trim();
     // Limpiar espacios extra o caracteres excepto dígitos y el signo +
     str = str.replace(/[^\d+]/g, '');
+    if (!str) return '';
     
     if (str.startsWith('+51')) {
         const num = str.substring(3);
@@ -71,7 +72,7 @@ function normalizarTelefonoPeru(phoneInput) {
     if (str.length > 0) {
         return str.startsWith('+') ? str : `+51 ${str}`;
     }
-    return '+51 900000000';
+    return '';
 }
 
 const XLSX = require('xlsx');

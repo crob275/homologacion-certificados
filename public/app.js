@@ -856,9 +856,17 @@ async function handleCertificateUpload(e) {
                 </div>
             ` : '';
 
+            const careceTel = !bd.trabajador_telefono || bd.trabajador_telefono === '+51 987654321' || bd.trabajador_telefono === '+51 900000000';
+            const bannerTelAlerta = careceTel ? `
+                <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; color: #fbbf24; font-size: 0.85rem;">
+                    📞 <strong>Teléfono de Contacto No Detectado:</strong> Este certificado digital no incluye número de celular. Por favor ingrese el número telefónico del empleado para alertas SMS/WhatsApp de habilitación.
+                </div>
+            ` : '';
+
             ocrText.innerHTML = `
                 ${badgeNuevo}
                 ${bannerDniAlerta}
+                ${bannerTelAlerta}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 5px;">
                     <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
                         <small style="color: var(--text-secondary); display: block;">Trabajador / DNI</small>
@@ -880,10 +888,10 @@ async function handleCertificateUpload(e) {
                 </div>
                 <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <div>
-                        Empresa: <strong>${bd.empresa_razon_social}</strong> (RUC: ${bd.empresa_ruc}) &bull; Notificación: <code>${bd.trabajador_email_personal}</code>
+                        Empresa: <strong>${bd.empresa_razon_social}</strong> &bull; Correo: <code>${bd.trabajador_email_personal}</code> &bull; Teléfono: <strong>${bd.trabajador_telefono ? bd.trabajador_telefono : '<span style="color: #fbbf24;">(No Registrado)</span>'}</strong>
                     </div>
-                    <button type="button" class="btn-primary" style="font-size: 0.78rem; padding: 4px 12px; ${careceDni ? 'background: #f59e0b; color: #000; font-weight: bold; border: 1px solid #fbbf24;' : 'background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${bd.trabajador_id}')">
-                        ${careceDni ? '⚠️ Completar DNI Real de ' + bd.trabajador_nombres : '✏️ Regularizar / Editar Ficha de ' + bd.trabajador_nombres}
+                    <button type="button" class="btn-primary" style="font-size: 0.78rem; padding: 4px 12px; ${(careceDni || careceTel) ? 'background: #f59e0b; color: #000; font-weight: bold; border: 1px solid #fbbf24;' : 'background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${bd.trabajador_id}')">
+                        ${careceDni ? '⚠️ Completar DNI de ' + bd.trabajador_nombres : (careceTel ? '📞 Registrar Teléfono de ' + bd.trabajador_nombres : '✏️ Editar Ficha de ' + bd.trabajador_nombres)}
                     </button>
                 </div>
             `;
@@ -940,12 +948,18 @@ async function handleCertificateUpload(e) {
                         ? `<span class="badge badge-warning" style="font-size: 0.68rem; padding: 1px 5px;" title="El certificado PDF no traía DNI impreso. Se asignó ID provisional.">⚠️ DNI Pendiente</span>`
                         : `<span class="badge badge-success" style="font-size: 0.68rem; padding: 1px 5px;">✓ DNI PDF</span>`;
                     
+                    const careceTel = !item.trabajador_telefono || item.trabajador_telefono === '+51 987654321' || item.trabajador_telefono === '+51 900000000';
+                    const tagTel = careceTel
+                        ? `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 0.68rem; padding: 1px 5px;" title="Sin teléfono">⚠️ Sin Teléfono</span>`
+                        : `<small style="color: var(--success); font-size: 0.72rem; display: block;">📞 ${item.trabajador_telefono}</small>`;
+                    
                     filasResultados += `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${careceDni ? 'background: rgba(245, 158, 11, 0.04);' : ''}">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${(careceDni || careceTel) ? 'background: rgba(245, 158, 11, 0.04);' : ''}">
                             <td style="padding: 6px 10px; color: var(--text-secondary); font-size: 0.8rem;">${idx + 1}</td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; font-weight: 600; color: #fff;">
                                 ${trabNombre}<br>
-                                <small style="color: ${careceDni ? 'var(--accent-amber)' : 'var(--accent-cyan)'}; font-family: monospace;">Doc: ${trabDni}</small> ${tagNuevo} ${tagDni}
+                                <small style="color: ${careceDni ? 'var(--accent-amber)' : 'var(--accent-cyan)'}; font-family: monospace;">Doc: ${trabDni}</small> ${tagNuevo} ${tagDni} ${careceTel ? tagTel : ''}
+                                ${!careceTel ? tagTel : ''}
                             </td>
                             <td style="padding: 6px 10px; font-size: 0.82rem; color: var(--accent-amber);">
                                 <strong>${certCurso}</strong><br>
@@ -963,8 +977,8 @@ async function handleCertificateUpload(e) {
                                         </button>
                                     ` : ''}
                                     ${trabId ? `
-                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; ${careceDni ? 'background: rgba(245, 158, 11, 0.25); border-color: #f59e0b; color: #fbbf24; font-weight: bold;' : 'background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${trabId}')" title="${careceDni ? 'Completar DNI Real de este Trabajador' : 'Editar Información'}">
-                                            ${careceDni ? '⚠️ Completar DNI' : '✏️ Editar'}
+                                        <button type="button" class="table-btn-action" style="padding: 3px 6px; font-size: 0.72rem; ${(careceDni || careceTel) ? 'background: rgba(245, 158, 11, 0.25); border-color: #f59e0b; color: #fbbf24; font-weight: bold;' : 'background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;'}" onclick="abrirModalEditarTrabajador('${trabId}')" title="${careceDni ? 'Completar DNI Real de este Trabajador' : (careceTel ? 'Registrar Teléfono' : 'Editar Información')}">
+                                            ${careceDni ? '⚠️ Completar DNI' : (careceTel ? '📞 Registrar Tel' : '✏️ Editar')}
                                         </button>
                                     ` : ''}
                                 </div>
@@ -975,6 +989,8 @@ async function handleCertificateUpload(e) {
             });
 
             const totalSinDni = (result.resultados || []).filter(r => r.requiere_regularizar_dni).length;
+            const totalSinTel = (result.resultados || []).filter(r => r.requiere_regularizar_telefono).length;
+
             const bannerSinDni = totalSinDni > 0 ? `
                 <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <div>
@@ -984,8 +1000,18 @@ async function handleCertificateUpload(e) {
                 </div>
             ` : '';
 
+            const bannerSinTel = totalSinTel > 0 ? `
+                <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <strong style="color: #38bdf8; font-size: 0.88rem;">📞 ${totalSinTel} Trabajador(es) sin número de celular registrado</strong>
+                        <div style="color: var(--text-secondary); font-size: 0.78rem;">Los certificados PDF no incluían teléfono. Use el botón <strong>[ 📞 Registrar Tel ]</strong> para agregarlo para alertas directas.</div>
+                    </div>
+                </div>
+            ` : '';
+
             ocrText.innerHTML = `
                 ${bannerSinDni}
+                ${bannerSinTel}
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
                     <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 6px; text-align: center;">
                         <small style="color: var(--text-secondary); display: block;">Total PDFs</small>
@@ -1281,8 +1307,10 @@ async function loadCertificados() {
                     <td>
                         <strong>${c.trabajador_nombre}</strong><br>
                         <small style="color: var(--text-secondary)">Doc: ${c.trabajador_doc}</small><br>
-                        <small style="color: var(--accent-blue)">✉️ ${c.trabajador_email}</small><br>
-                        <small style="color: var(--success)">📞 ${c.trabajador_telefono}</small>
+                        <small style="color: var(--accent-blue)">✉️ ${c.trabajador_email || '<span style="color: var(--accent-amber);">Sin correo</span>'}</small><br>
+                        ${(c.trabajador_telefono && c.trabajador_telefono !== '+51 987654321' && c.trabajador_telefono !== '+51 900000000') 
+                            ? `<small style="color: var(--success)">📞 ${c.trabajador_telefono}</small>` 
+                            : `<button type="button" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; margin-top: 2px;" title="Teléfono no registrado. Clic para ingresar número real.">⚠️ Registrar Teléfono</button>`}
                     </td>
                     <td>
                         <strong>${c.empresa_nombre}</strong><br>

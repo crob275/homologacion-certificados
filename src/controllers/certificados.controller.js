@@ -112,10 +112,12 @@ async function uploadPDFOCR(req, res) {
                 emailPersonal = `${nombres.toLowerCase().replace(/\s+/g, '.')}@gmail.com`;
             }
 
+            const telefonoInicial = extracted.telefonoTrabajador || null;
+
             await runDB(`
                 INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, estado_habilitacion)
                 VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, ?, ?, 'INHABILITADO')
-            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, emailPersonal, '+51 987654321', cargoFinal, areaFinal]);
+            `, [nuevoId, empresaSeleccionadaId, nuevoDoc, nombres, apellidos, emailPersonal, telefonoInicial, cargoFinal, areaFinal]);
 
             trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
             esNuevoTrabajador = true;
@@ -205,6 +207,7 @@ async function uploadPDFOCR(req, res) {
                 trabajador_documento: trabajador.numero_documento,
                 trabajador_cargo: trabajador.cargo_puesto,
                 trabajador_email_personal: trabajador.email_personal,
+                trabajador_telefono: trabajador.telefono_personal,
                 empresa_razon_social: empresa.razon_social,
                 empresa_ruc: empresa.ruc_rut,
                 empresa_email_contacto: empresa.email_contacto
@@ -308,10 +311,12 @@ async function uploadBatchPDFOCR(req, res) {
                         ? extracted.dniTrabajador 
                         : ('TEMP_' + Math.floor(Math.random() * 899999 + 100000));
 
+                    const telBatchInicial = extracted.telefonoTrabajador || null;
+
                     await runDB(`
                         INSERT INTO trabajadores (id, empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, estado_habilitacion)
                         VALUES (?, ?, 'DNI', ?, ?, ?, ?, ?, ?, ?, 'INHABILITADO')
-                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, emailPersonal, '+51 987654321', cargoPuestoFinal, areaTrabajoFinal]);
+                    `, [nuevoId, empresa.id, docFinal, nombres, apellidos, emailPersonal, telBatchInicial, cargoPuestoFinal, areaTrabajoFinal]);
 
                     trabajador = await getDB('SELECT * FROM trabajadores WHERE id = ?', [nuevoId]);
                     esNuevoTrabajador = true;
@@ -381,8 +386,10 @@ async function uploadBatchPDFOCR(req, res) {
                     trabajador_nombre: `${trabajador.nombres} ${trabajador.apellidos}`,
                     trabajador_dni: trabajador.numero_documento,
                     trabajador_email: trabajador.email_personal,
+                    trabajador_telefono: trabajador.telefono_personal,
                     dni_extraido_en_pdf: Boolean(extracted.dniTrabajador && extracted.dniTrabajador.length === 8),
                     requiere_regularizar_dni: careceDNI,
+                    requiere_regularizar_telefono: !trabajador.telefono_personal,
                     correo_notificado: correoEnviado,
                     curso_reconocido: extracted.nombreCurso,
                     entidad_emisora: extracted.entidad,

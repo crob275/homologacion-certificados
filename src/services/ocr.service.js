@@ -21,6 +21,13 @@ async function extractTextFromPDF(pdfBuffer) {
         console.log('PDF text parsing error:', e.message);
     }
 
+    // Limpiar marcas de agua de librerías PDF que contaminan nombres de alumnos (ej. TCPDF, FPDF, iText)
+    if (text) {
+        text = text.replace(/Powered\s+by\s+TCPDF\s*(?:\([^\)]*\))?/gi, '');
+        text = text.replace(/www\.tcpdf\.org/gi, '');
+        text = text.replace(/TCPDF/gi, '');
+    }
+
     // 2. If vector text is missing or scarce, perform Real OCR on embedded certificate image
     if (text.length < 25 && pdfBuffer && pdfBuffer.length > 0) {
         try {
@@ -134,7 +141,9 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         return u.includes('COORDINADOR') || u.includes('DIRECTOR') || u.includes('DIRECTORA') || 
                u.includes('GERENTE') || u.includes('INSTRUCTOR') || u.includes('DOCENTE') || 
                u.includes('FACILITADOR') || u.includes('FELIPE SÁENZ') || u.includes('FELIPE SAENZ') || 
-               u.includes('JULIANA SILVA') || u.includes('INGENIERO') || u.includes('SUPERVISOR');
+               u.includes('JULIANA SILVA') || u.includes('INGENIERO') || u.includes('SUPERVISOR') ||
+               u.includes('TCPDF') || u.includes('POWERED BY') || u.includes('WWW.') || u.includes('.ORG') ||
+               u.includes('.COM') || u.includes('HTTP');
     };
 
     // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Otorgado a" o "Conferido a"
@@ -291,9 +300,17 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
+    // 7. Extraer Teléfono / Celular si figura en el documento (ej. 9 dígitos empezando en 9)
+    let telefonoTrabajador = null;
+    const matchTel = text.match(/(?:TEL[EÉ]FONO|CELULAR|M[OÓ]VIL|WHATSAPP|CONTACTO)?\s*[:#\.\-]?\s*(?:\+?51\s*)?(9\d{8})\b/i);
+    if (matchTel && matchTel[1]) {
+        telefonoTrabajador = `+51 ${matchTel[1]}`;
+    }
+
     return { 
         dniTrabajador, 
         nombreTrabajador, 
+        telefonoTrabajador,
         nombreCurso, 
         entidad, 
         horas, 

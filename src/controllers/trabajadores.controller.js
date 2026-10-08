@@ -53,7 +53,8 @@ async function actualizarTrabajador(req, res) {
         const { id } = req.params;
         const { empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telefono_personal, cargo_puesto, area_trabajo, foto_perfil } = req.body;
 
-        const telNorm = telefono_personal !== undefined ? normalizarTelefonoPeru(telefono_personal) : undefined;
+        // Si se envió telefono_personal, usar el valor normalizado o null si está vacío
+        const telNorm = (telefono_personal !== undefined) ? (normalizarTelefonoPeru(telefono_personal) || null) : undefined;
 
         await runDB(`
             UPDATE trabajadores SET
@@ -63,13 +64,13 @@ async function actualizarTrabajador(req, res) {
                 nombres = COALESCE(?, nombres),
                 apellidos = COALESCE(?, apellidos),
                 email_personal = COALESCE(?, email_personal),
-                telefono_personal = COALESCE(?, telefono_personal),
+                telefono_personal = CASE WHEN ? IS NOT NULL THEN ? ELSE telefono_personal END,
                 cargo_puesto = COALESCE(?, cargo_puesto),
                 area_trabajo = COALESCE(?, area_trabajo),
                 foto_perfil = COALESCE(?, foto_perfil),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `, [empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telNorm, cargo_puesto, area_trabajo, foto_perfil, id]);
+        `, [empresa_id, tipo_documento, numero_documento, nombres, apellidos, email_personal, telNorm, telNorm, cargo_puesto, area_trabajo, foto_perfil, id]);
 
         const trabActualizado = await getDB('SELECT * FROM trabajadores WHERE id = ?', [id]);
         res.json({ message: 'Trabajador actualizado en BD.', trabajador: trabActualizado });
