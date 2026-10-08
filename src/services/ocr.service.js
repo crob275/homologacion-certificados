@@ -135,24 +135,27 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
     let nombreTrabajador = null;
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-    // Lista negra estricta de palabras clave de firmas y autoridades que NUNCA deben tomarse como alumno
+    // Lista negra estricta de palabras clave de firmas, cargos y autoridades que NUNCA deben tomarse como alumno
     const esPalabraDeFirma = (str) => {
         const u = str.toUpperCase();
         return u.includes('COORDINADOR') || u.includes('DIRECTOR') || u.includes('DIRECTORA') || 
                u.includes('GERENTE') || u.includes('INSTRUCTOR') || u.includes('DOCENTE') || 
                u.includes('FACILITADOR') || u.includes('FELIPE SÁENZ') || u.includes('FELIPE SAENZ') || 
                u.includes('JULIANA SILVA') || u.includes('INGENIERO') || u.includes('SUPERVISOR') ||
+               u.includes('EMILIO BENAVENTE') || u.includes('BENAVENTE NAJAR') ||
+               u.includes('TRAIN THE TRAINER') || u.includes('OSHA') || u.includes('COD.') ||
+               u.includes('EBN CONSULTORES') || u.includes('INDIGO') || u.includes('INSTITUTE') ||
                u.includes('TCPDF') || u.includes('POWERED BY') || u.includes('WWW.') || u.includes('.ORG') ||
-               u.includes('.COM') || u.includes('HTTP');
+               u.includes('.COM') || u.includes('.PE') || u.includes('HTTP');
     };
 
-    // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Otorgado a" o "Conferido a"
-    const idxOtorgado = lines.findIndex(l => /(?:otorgado\s+a|conferido\s+a|certifica\s+que|otorgado\s+al?\s*sr\.?|a\s*:)/i.test(l));
+    // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Certifica a", "Otorgado a" o "Conferido a"
+    const idxOtorgado = lines.findIndex(l => /(?:certifica\s+a\:?|otorgado\s+a|conferido\s+a|certifica\s+que|otorgado\s+al?\s*sr\.?|a\s*:)/i.test(l));
     if (idxOtorgado !== -1) {
         for (let i = idxOtorgado + 1; i < Math.min(idxOtorgado + 5, lines.length); i++) {
             const rawCand = lines[i].replace(/["'”]/g, '').trim();
-            // Ignorar textos que inician la descripción del curso
-            if (/^(?:por|haber|completado|satisfactoriamente|en|el|la|diplomado|curso|participado)/i.test(rawCand)) break;
+            // Ignorar textos que inician la descripción del curso o relación laboral
+            if (/^(?:por|haber|completado|satisfactoriamente|en|el|la|diplomado|curso|participado|empleado\s+de)/i.test(rawCand)) break;
             // Limpiar ruido numérico o símbolos
             const lettersOnly = rawCand.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
             const words = lettersOnly.split(/\s+/).filter(w => w.length >= 2);
@@ -169,7 +172,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // Estrategia 2.2: Regex directo en bloque
     if (!nombreTrabajador) {
-        const matchNombreOtorgado = text.match(/(?:Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
+        const matchNombreOtorgado = text.match(/(?:Certifica\s+a\:?|Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
         if (matchNombreOtorgado && matchNombreOtorgado[1]) {
             const cand = matchNombreOtorgado[1].split(/\r?\n/)[0].replace(/["'”]/g, '').trim();
             if (!esPalabraDeFirma(cand) && cand.split(/\s+/).length >= 2) {
@@ -178,15 +181,17 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    // Estrategia 2.3: Buscar líneas nominativas descartando firmas
+    // Estrategia 2.3: Buscar líneas nominativas descartando firmas y empresas
     if (!nombreTrabajador) {
         for (const line of lines) {
-            if (/^[A-ZÁÉÍÓÚÑa-z]{3,}\s+[A-ZÁÉÍÓÚÑa-z]{3,}(?:\s+[A-ZÁÉÍÓÚÑa-z]{3,})?$/.test(line) && 
+            if (/^[A-ZÁÉÍÓÚÑa-z]{3,}(?:\s+[A-ZÁÉÍÓÚÑa-z]{3,}){1,3}$/.test(line) && 
                 !line.toUpperCase().includes('CERTIFICADO') && 
                 !line.toUpperCase().includes('RECONOCIMIENTO') &&
                 !line.toUpperCase().includes('TECSUP') && 
                 !line.toUpperCase().includes('SENATI') && 
                 !line.toUpperCase().includes('SEGURIDAD') && 
+                !line.toUpperCase().includes('EMPLEADO') &&
+                !line.toUpperCase().includes('NETAXION') &&
                 !esPalabraDeFirma(line)) {
                 nombreTrabajador = line;
                 break;
@@ -307,11 +312,20 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         telefonoTrabajador = `+51 ${matchTel[1]}`;
     }
 
-    // 8. Extraer Correo Electrónico si figura en el documento
+    // 8. Extraer Correo Electrónico PERSONAL del trabajador (descartando correos de la entidad certificadora o empresa)
     let emailTrabajador = null;
     const matchEmail = text.match(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
-    if (matchEmail && matchEmail[1] && !matchEmail[1].toLowerCase().includes('tcpdf') && !matchEmail[1].toLowerCase().includes('example.com')) {
-        emailTrabajador = matchEmail[1].toLowerCase();
+    if (matchEmail && matchEmail[1]) {
+        const em = matchEmail[1].toLowerCase();
+        // Descartar correos institucionales de los centros de capacitación o software
+        const esCorreoInstitucional = em.includes('administracion@') || em.includes('contacto@') || 
+                                     em.includes('info@') || em.includes('informes@') || 
+                                     em.includes('soporte@') || em.includes('ebn.pe') || 
+                                     em.includes('tecsup') || em.includes('senati') || 
+                                     em.includes('tcpdf') || em.includes('example');
+        if (!esCorreoInstitucional) {
+            emailTrabajador = em;
+        }
     }
 
     return { 
