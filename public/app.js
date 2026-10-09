@@ -1455,6 +1455,8 @@ async function enviarAlertaIndividualJS(certId) {
     } catch (err) {
         alert('Error: ' + err.message);
     }
+}
+
 async function enviarNotificacionMasivaIncompletosJS() {
     const incompletosCount = parseInt(document.getElementById('badge-count-incompletos')?.textContent || '0', 10);
     if (incompletosCount === 0) {
