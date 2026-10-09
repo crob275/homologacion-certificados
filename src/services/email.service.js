@@ -91,9 +91,11 @@ async function despacharViaBrevoHTTPS({ to, subject, html, replyTo = null }) {
     const apiKey = process.env.BREVO_API_KEY;
     if (!apiKey) return null;
 
-    const destinatarios = (Array.isArray(to) ? to : [to]).map(correo => ({
-        email: typeof correo === 'string' ? correo.trim() : (correo.email || '').trim()
-    })).filter(d => d.email.length > 0);
+    // Normalizar si 'to' es string con comas o array
+    const rawList = Array.isArray(to) ? to : (typeof to === 'string' ? to.split(',') : [to]);
+    const destinatarios = rawList.map(correo => ({
+        email: typeof correo === 'string' ? correo.trim() : ((correo && correo.email) || '').trim()
+    })).filter(d => d.email && d.email.includes('@'));
 
     if (destinatarios.length === 0) return null;
 
@@ -162,11 +164,15 @@ async function despacharViaResendHTTPS({ to, subject, html, replyTo = null }) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return null;
 
+    const rawList = Array.isArray(to) ? to : (typeof to === 'string' ? to.split(',') : [to]);
+    const cleanList = rawList.map(c => typeof c === 'string' ? c.trim() : ((c && c.email) || '').trim()).filter(e => e && e.includes('@'));
+    if (cleanList.length === 0) return null;
+
     const https = require('https');
     return new Promise((resolve) => {
         const payload = JSON.stringify({
             from: 'HomologaControl HSE <onboarding@resend.dev>',
-            to: Array.isArray(to) ? to : [to],
+            to: cleanList,
             reply_to: replyTo || process.env.SMTP_USER || 'cristianre257@gmail.com',
             subject: subject,
             html: html
