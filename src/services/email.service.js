@@ -418,6 +418,19 @@ function generarHTMLAlertaMinera({ trabajador, certificado, empresa, diasRestant
         </div>
     ` : '';
 
+    const faltaTelefono = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || String(trabajador.telefono_personal).trim() === '';
+
+    const telefonoDisplayHTML = faltaTelefono
+        ? `<span style="color: #f59e0b; background: rgba(245, 158, 11, 0.2); padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #f59e0b;">⚠️ PENDIENTE DE REGISTRO</span>`
+        : `<span style="color: #ffffff; font-weight: bold;">${trabajador.telefono_personal}</span>`;
+
+    const avisoTelefonoHTML = faltaTelefono ? `
+        <div style="background: rgba(245, 158, 11, 0.12); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #fef3c7;">
+            <strong style="color: #fbbf24; font-size: 13px;">⚠️ ADVERTENCIA DE CONTACTO OPERATIVO:</strong><br>
+            El trabajador no cuenta con un <strong>número de celular</strong> registrado en el sistema. Es necesario coordinar la actualización de su teléfono celular con su supervisor para recibir alertas preventivas y coordinaciones de garita en mina.
+        </div>
+    ` : '';
+
     return `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
             <div style="background: ${colorHeader}; padding: 20px 25px; color: #ffffff;">
@@ -430,6 +443,7 @@ function generarHTMLAlertaMinera({ trabajador, certificado, empresa, diasRestant
             </div>
             <div style="padding: 25px;">
                 ${bannerPrueba}
+                ${avisoTelefonoHTML}
                 <div style="background: #1e293b; padding: 15px; border-radius: 8px; border-left: 4px solid ${colorHeader}; margin-bottom: 20px;">
                     <span style="font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Estado del Certificado en Base de Datos</span>
                     <h3 style="margin: 5px 0 0 0; color: #ffffff; font-size: 17px;">${estadoTexto}</h3>
@@ -439,6 +453,10 @@ function generarHTMLAlertaMinera({ trabajador, certificado, empresa, diasRestant
                     <tr>
                         <td style="padding: 8px 0; color: #94a3b8; width: 40%;">👤 Trabajador Registrado:</td>
                         <td style="padding: 8px 0; font-weight: bold; color: #ffffff;">${trabajador.nombres} ${trabajador.apellidos} (DNI: ${trabajador.numero_documento})</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #94a3b8;">📱 Teléfono Celular:</td>
+                        <td style="padding: 8px 0;">${telefonoDisplayHTML}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #94a3b8;">🏢 Empresa Contratista:</td>
@@ -568,7 +586,14 @@ async function enviarAlertaIndividual(certificadoId, testEmailOverride = null) {
     else if (diasRestantes <= 30) etapa = '30_DIAS';
 
     return await enviarAlertaVencimiento({
-        trabajador: { id: cert.trab_id, nombres: cert.trab_nombres, apellidos: cert.trab_apellidos, numero_documento: cert.trab_doc, email_personal: cert.trab_email },
+        trabajador: { 
+            id: cert.trab_id, 
+            nombres: cert.trab_nombres, 
+            apellidos: cert.trab_apellidos, 
+            numero_documento: cert.trab_doc, 
+            email_personal: cert.trab_email,
+            telefono_personal: cert.trab_telefono 
+        },
         certificado: { id: cert.id, nombre_curso: cert.nombre_curso, fecha_vencimiento: cert.fecha_vencimiento },
         empresa: { id: cert.emp_id, razon_social: cert.emp_nombre, email_contacto: cert.emp_email },
         diasRestantes,
@@ -652,7 +677,14 @@ async function ejecutarEscaneoAlertasEscalonadas(empresaIdFiltro = null, testEma
         // Si califica para disparar aviso escalonado
         if (etapaADisparar) {
             const enviada = await enviarAlertaVencimiento({
-                trabajador: { id: c.trab_id, nombres: c.trab_nombres, apellidos: c.trab_apellidos, numero_documento: c.trab_doc, email_personal: c.trab_email },
+                trabajador: { 
+                    id: c.trab_id, 
+                    nombres: c.trab_nombres, 
+                    apellidos: c.trab_apellidos, 
+                    numero_documento: c.trab_doc, 
+                    email_personal: c.trab_email,
+                    telefono_personal: c.trab_telefono 
+                },
                 certificado: { id: c.id, nombre_curso: c.nombre_curso, fecha_vencimiento: c.fecha_vencimiento },
                 empresa: { id: c.emp_id, razon_social: c.emp_nombre, email_contacto: c.emp_email },
                 diasRestantes,
