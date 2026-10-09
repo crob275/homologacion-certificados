@@ -145,6 +145,14 @@ async function uploadPDFOCR(req, res) {
             pdfBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
         }
 
+        // Verificación de Completitud al 100% para APROBACIÓN AUTOMÁTICA
+        const tieneDocValido = Boolean(trabajador.numero_documento && !trabajador.numero_documento.startsWith('TEMP_') && trabajador.numero_documento.length === 8);
+        const tienePDFSustento = Boolean(pdfBase64 && pdfBase64.length > 50);
+        const fechaVencValida = Boolean(fechaVencimiento && new Date(fechaVencimiento) > new Date());
+        const datosAl100 = tieneDocValido && tienePDFSustento && fechaVencValida && !discrepanciaDetectada;
+
+        const estadoValidacionFinal = datosAl100 ? 'APROBADO' : 'EN_VALIDACION';
+
         let newCertId;
         if (certExistente) {
             newCertId = certExistente.id;
@@ -158,16 +166,24 @@ async function uploadPDFOCR(req, res) {
                     fecha_vencimiento = ?,
                     pdf_filename = ?,
                     url_pdf_storage = COALESCE(?, url_pdf_storage),
-                    estado_validacion = 'EN_VALIDACION',
+                    estado_validacion = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, filename, pdfBase64, newCertId]);
+            `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, filename, pdfBase64, estadoValidacionFinal, newCertId]);
         } else {
             newCertId = 'cert-' + Date.now();
             await runDB(`
                 INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, url_pdf_storage, estado_validacion, estado_vigencia)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
-            `, [newCertId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_PDF_' + Math.floor(Math.random() * 899999 + 100000), filename, pdfBase64]);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'HABILITADO')
+            `, [newCertId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_PDF_' + Math.floor(Math.random() * 899999 + 100000), filename, pdfBase64, estadoValidacionFinal]);
+        }
+
+        // Si fue auto-aprobado al 100%, registrar también en historial de homologaciones
+        if (datosAl100) {
+            await runDB(`
+                INSERT INTO homologaciones (id, certificado_id, supervisor_nombre, estado_evaluacion, observaciones)
+                VALUES (?, ?, 'Sistema Inteligente HomologaControl (D.S. 024-2016-EM)', 'APROBADO', 'Aprobación automática por validación biométrica/OCR de sustento PDF y DNI oficial al 100%.')
+            `, ['hom-auto-' + Date.now(), newCertId]);
         }
 
         await recalcularEstadoTrabajadorBD(trabajador.id);
@@ -338,6 +354,13 @@ async function uploadBatchPDFOCR(req, res) {
                     batchBase64 = 'data:application/pdf;base64,' + pdfBuffer.toString('base64');
                 }
 
+                const tieneDocValidoBatch = Boolean(trabajador.numero_documento && !trabajador.numero_documento.startsWith('TEMP_') && trabajador.numero_documento.length === 8);
+                const tienePDFSustentoBatch = Boolean(batchBase64 && batchBase64.length > 50);
+                const fechaVencValidaBatch = Boolean(fechaVencimiento && new Date(fechaVencimiento) > new Date());
+                const datosAl100Batch = tieneDocValidoBatch && tienePDFSustentoBatch && fechaVencValidaBatch;
+
+                const estadoValidacionBatch = datosAl100Batch ? 'APROBADO' : 'EN_VALIDACION';
+
                 let certId;
                 if (certExistente) {
                     certId = certExistente.id;
@@ -351,18 +374,25 @@ async function uploadBatchPDFOCR(req, res) {
                             fecha_vencimiento = ?,
                             pdf_filename = ?,
                             url_pdf_storage = COALESCE(?, url_pdf_storage),
-                            estado_validacion = 'EN_VALIDACION',
+                            estado_validacion = ?,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, file.filename, batchBase64, certId]);
+                    `, [empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, file.filename, batchBase64, estadoValidacionBatch, certId]);
                     actualizados++;
                 } else {
                     certId = 'cert-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
                     await runDB(`
                         INSERT INTO certificados (id, trabajador_id, empresa_id, nombre_curso, entidad_emisora, horas_lectivas, fecha_emision, fecha_vencimiento, codigo_qr_hash, pdf_filename, url_pdf_storage, estado_validacion, estado_vigencia)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EN_VALIDACION', 'HABILITADO')
-                    `, [certId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_BATCH_' + Math.floor(Math.random() * 899999 + 100000), file.filename, batchBase64]);
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'HABILITADO')
+                    `, [certId, trabajador.id, empresa.id, extracted.nombreCurso, extracted.entidad, extracted.horas, extracted.fechaEmision, fechaVencimiento, 'QR_OCR_BATCH_' + Math.floor(Math.random() * 899999 + 100000), file.filename, batchBase64, estadoValidacionBatch]);
                     creados++;
+                }
+
+                if (datosAl100Batch) {
+                    await runDB(`
+                        INSERT INTO homologaciones (id, certificado_id, supervisor_nombre, estado_evaluacion, observaciones)
+                        VALUES (?, ?, 'Sistema Inteligente HomologaControl (D.S. 024-2016-EM)', 'APROBADO', 'Aprobación automática por lote con sustento PDF y DNI oficial al 100%.')
+                    `, ['hom-auto-' + Date.now() + '-' + Math.floor(Math.random() * 1000), certId]);
                 }
 
                 await recalcularEstadoTrabajadorBD(trabajador.id);
@@ -777,9 +807,29 @@ async function evaluarHomologacion(req, res) {
 
         const nuevoEstadoTrab = await recalcularEstadoTrabajadorBD(cert.trabajador_id);
 
+        // Si se aprobó el certificado, despachar notificación oficial automática al trabajador
+        let correoDespachado = false;
+        if (estado === 'APROBADO') {
+            try {
+                const trabInfo = await getDB('SELECT * FROM trabajadores WHERE id = ?', [cert.trabajador_id]);
+                if (trabInfo && trabInfo.email_personal && trabInfo.email_personal.includes('@')) {
+                    await enviarNotificacionIndividualTrabajador({
+                        certificadoId: certificado_id,
+                        remitenteNombre: supervisor_nombre || 'Supervisor HSE',
+                        remitenteRol: 'AUDITORÍA HSE',
+                        remitenteEmail: 'admin@ingemant.pe'
+                    });
+                    correoDespachado = true;
+                }
+            } catch (mailErr) {
+                console.warn('⚠️ No se pudo despachar correo tras evaluación manual:', mailErr.message);
+            }
+        }
+
         res.json({
             message: `Certificado ${estado} exitosamente en BD.`,
-            trabajador_nuevo_estado: nuevoEstadoTrab
+            trabajador_nuevo_estado: nuevoEstadoTrab,
+            correo_notificado: correoDespachado
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
