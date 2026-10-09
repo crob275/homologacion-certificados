@@ -2209,10 +2209,34 @@ async function handleSaveTrabajadorEdit(e) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al actualizar empleado.');
 
-        alert('¡Datos y foto del empleado actualizados exitosamente en la Base de Datos!');
         closeEditTrabajadorModal();
         loadCertificados();
         loadDashboardKPIs();
+
+        if (payload.email_personal && payload.email_personal.includes('@')) {
+            const deseaReenviar = confirm(`¿Desea reenviar de inmediato la Notificación Oficial de Habilitación al nuevo correo registrado (${payload.email_personal})?`);
+            if (deseaReenviar) {
+                try {
+                    const notifyRes = await fetch('/api/v1/trabajadores/reenviar-notificacion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trabajador_id: id, email_nuevo: payload.email_personal })
+                    });
+                    const notifyData = await notifyRes.json();
+                    if (notifyRes.ok) {
+                        alert(`¡Notificación oficial enviada exitosamente a ${payload.email_personal}!`);
+                        if (notifyData && notifyData.cuerpo_html) {
+                            mostrarModalPreviewHTML(notifyData);
+                        }
+                    } else {
+                        alert('No se pudo enviar el correo: ' + (notifyData.error || 'Error desconocido'));
+                    }
+                } catch (errNotif) {
+                    console.error('Error al reenviar notificación:', errNotif);
+                    alert('Error de conexión al despachar el correo: ' + errNotif.message);
+                }
+            }
+        }
     } catch (err) {
         alert('Error guardando cambios: ' + err.message);
     }
