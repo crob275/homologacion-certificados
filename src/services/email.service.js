@@ -701,9 +701,9 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
     let explicacionHTML = '';
 
     const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
-    const cargoIncompleto = !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
-    const faltaPDFSustento = !certificado.url_pdf_storage && (!certificado.pdf_filename || certificado.pdf_filename.includes('Excel'));
-    const faltaDatos = dniEsTemporal || cargoIncompleto || faltaPDFSustento;
+    const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
+    const faltaPDFSustento = !tienePDFReal;
+    const faltaDatos = dniEsTemporal || faltaPDFSustento;
 
     if (faltaDatos) {
         estadoKey = 'PENDIENTE_REGULARIZAR';
@@ -719,7 +719,6 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
                 <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6;">
                     ${faltaPDFSustento ? '<li><strong>📎 Falta adjuntar archivo PDF original:</strong> Se registró por planilla/Excel pero aún no se ha cargado el documento digital escaneado del diploma para auditoría en garita.</li>' : ''}
                     ${dniEsTemporal ? '<li><strong>Falta DNI oficial:</strong> Se asignó un identificador provisional (' + trabajador.numero_documento + ').</li>' : ''}
-                    ${cargoIncompleto ? '<li><strong>Cargo / Área no asignada:</strong> Tu perfil figura como "Pendiente de Asignación".</li>' : ''}
                 </ul>
                 👉 <strong>¿Qué debes hacer?:</strong> Comunícate con tu empresa contratista (<strong>${empresa.razon_social}</strong>) o sube tu diploma en la sección <code>[ Carga de Cuadrillas & OCR ]</code> para anexar el PDF original a tu expediente.
             </div>
@@ -840,7 +839,9 @@ async function enviarNotificacionIndividualTrabajador(params) {
                 horas_lectivas: cert.horas_lectivas,
                 fecha_emision: cert.fecha_emision,
                 fecha_vencimiento: cert.fecha_vencimiento,
-                codigo_qr_hash: cert.codigo_qr_hash
+                codigo_qr_hash: cert.codigo_qr_hash,
+                pdf_filename: cert.pdf_filename,
+                url_pdf_storage: cert.url_pdf_storage
             };
             empresa = {
                 id: cert.emp_id,
@@ -869,9 +870,9 @@ async function enviarNotificacionIndividualTrabajador(params) {
     }
 
     const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
-    const cargoIncompleto = !trabajador.cargo_puesto || trabajador.cargo_puesto.includes('Pendiente');
-    const faltaPDFSustento = !certificado.url_pdf_storage && (!certificado.pdf_filename || certificado.pdf_filename.includes('Excel'));
-    const faltaDatos = dniEsTemporal || cargoIncompleto || faltaPDFSustento;
+    const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
+    const faltaPDFSustento = !tienePDFReal;
+    const faltaDatos = dniEsTemporal || faltaPDFSustento;
 
     let asunto = '';
     if (faltaPDFSustento) {

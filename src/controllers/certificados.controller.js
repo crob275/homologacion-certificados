@@ -88,8 +88,8 @@ async function uploadPDFOCR(req, res) {
             const nuevoDoc = dniExtraido ? extracted.dniTrabajador : ('TEMP_' + Math.floor(Math.random() * 899999 + 100000));
             let nombres = '';
             let apellidos = '';
-            let cargoFinal = 'Pendiente de Asignación';
-            let areaFinal = null;
+            let cargoFinal = 'Técnico Especialista';
+            let areaFinal = 'Operaciones';
 
             const nombreLimpio = extracted.nombreTrabajador.trim();
             const partes = nombreLimpio.split(/\s+/);
@@ -285,8 +285,8 @@ async function uploadBatchPDFOCR(req, res) {
                     let apellidos = '';
                     let emailPersonal = '';
 
-                    let cargoPuestoFinal = 'Pendiente de Asignación';
-                    let areaTrabajoFinal = null;
+                    let cargoPuestoFinal = 'Técnico Especialista';
+                    let areaTrabajoFinal = 'Operaciones';
 
                     const partes = extracted.nombreTrabajador.trim().split(/\s+/);
                     nombres = partes[0] || 'Operario';
