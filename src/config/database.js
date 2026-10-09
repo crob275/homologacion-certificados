@@ -418,6 +418,19 @@ async function setupMySQLSchemaAndSeeds() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
 
+        // 7. Tabla homologaciones (Auditoría y Validación HSE)
+        await mysqlPool.query(`
+            CREATE TABLE IF NOT EXISTS homologaciones (
+                id VARCHAR(36) PRIMARY KEY,
+                certificado_id VARCHAR(36) NOT NULL,
+                supervisor_nombre VARCHAR(150),
+                estado_evaluacion VARCHAR(50) DEFAULT 'APROBADO',
+                observaciones TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_hom_cert (certificado_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
         // Migraciones preventivas para tablas existentes con esquemas antiguos
         const safeAddColumn = async (table, colDef) => {
             try {
