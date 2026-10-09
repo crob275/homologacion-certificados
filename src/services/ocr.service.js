@@ -44,11 +44,25 @@ async function extractTextFromPDF(pdfBuffer) {
                 if (wM && hM) {
                     const width = parseInt(wM[1]);
                     const height = parseInt(hM[1]);
+                    const isDCT = chunk.includes('DCTDecode');
                     const sStart = pdfBuffer.indexOf(Buffer.from('stream'), pos) + 6;
                     let s = sStart;
                     while (pdfBuffer[s] === 10 || pdfBuffer[s] === 13) s++;
                     const sEnd = pdfBuffer.indexOf(Buffer.from('endstream'), s);
                     const streamSlice = pdfBuffer.subarray(s, sEnd);
+
+                    if (isDCT || (streamSlice[0] === 0xFF && streamSlice[1] === 0xD8)) {
+                        try {
+                            const { data: { text: ocrText } } = await Tesseract.recognize(streamSlice, 'spa');
+                            if (ocrText && ocrText.trim().length > 10) {
+                                text = ocrText;
+                                console.log('✅ OCR con Tesseract reconoció exitosamente texto en imagen JPEG del PDF:', ocrText.substring(0, 100) + '...');
+                                break;
+                            }
+                        } catch (dctErr) {
+                            console.warn('Fallo OCR directo sobre JPEG:', dctErr.message);
+                        }
+                    }
 
                     let decomp = null;
                     if (isRunLength) {
@@ -131,7 +145,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    // 2. Extraer Nombre del Trabajador (Con filtro estricto anti-firmantes y reconocimiento tras "Otorgado a")
+    // 2. Extraer Nombre del Trabajador (Con filtro estricto anti-firmantes y reconocimiento tras "Otorgado a", "Otorga el presente diploma a")
     let nombreTrabajador = null;
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
@@ -145,22 +159,22 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
                u.includes('EMILIO BENAVENTE') || u.includes('BENAVENTE NAJAR') ||
                u.includes('TRAIN THE TRAINER') || u.includes('OSHA') || u.includes('COD.') ||
                u.includes('EBN CONSULTORES') || u.includes('INDIGO') || u.includes('INSTITUTE') ||
+               u.includes('ESGOB') || u.includes('ESCUELA') ||
                u.includes('TCPDF') || u.includes('POWERED BY') || u.includes('WWW.') || u.includes('.ORG') ||
                u.includes('.COM') || u.includes('.PE') || u.includes('HTTP');
     };
 
-    // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Certifica a", "Otorgado a" o "Conferido a"
-    const idxOtorgado = lines.findIndex(l => /(?:certifica\s+a\:?|otorgado\s+a|conferido\s+a|certifica\s+que|otorgado\s+al?\s*sr\.?|a\s*:)/i.test(l));
+    // Estrategia 2.1: Buscar la línea inmediatamente posterior a "Certifica a", "Otorgado a", "Otorga el presente diploma a"
+    const idxOtorgado = lines.findIndex(l => /(?:certifica\s+a\:?|otorgado\s+a|conferido\s+a|certifica\s+que|otorgado\s+al?\s*sr\.?|otorga\s+(?:el\s+)?(?:presente\s+)?(?:diploma|certificado|constancia)\s+a|a\s*:)/i.test(l));
     if (idxOtorgado !== -1) {
         for (let i = idxOtorgado + 1; i < Math.min(idxOtorgado + 5, lines.length); i++) {
             const rawCand = lines[i].replace(/["'”]/g, '').trim();
             // Ignorar textos que inician la descripción del curso o relación laboral
-            if (/^(?:por|haber|completado|satisfactoriamente|en|el|la|diplomado|curso|participado|empleado\s+de)/i.test(rawCand)) break;
+            if (/^(?:por|haber|completado|concluido|aprobado|satisfactoriamente|en|el|la|diplomado|curso|programa|participado|empleado\s+de)/i.test(rawCand)) break;
             // Limpiar ruido numérico o símbolos
             const lettersOnly = rawCand.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
             const words = lettersOnly.split(/\s+/).filter(w => w.length >= 2);
             if (words.length >= 2 && lettersOnly.length >= 6 && !esPalabraDeFirma(rawCand)) {
-                // Limpieza de letras deformadas por cursiva
                 let clean = lettersOnly;
                 clean = clean.replace(/\bChuistian\b/gi, 'Christian');
                 clean = clean.replace(/\bOdega\b/gi, 'Ortega');
@@ -172,7 +186,7 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // Estrategia 2.2: Regex directo en bloque
     if (!nombreTrabajador) {
-        const matchNombreOtorgado = text.match(/(?:Certifica\s+a\:?|Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
+        const matchNombreOtorgado = text.match(/(?:Certifica\s+a\:?|Otorgado\s+a|otorgado\s+a|OTORGADO\s+A|Otorga\s+(?:el\s+)?(?:presente\s+)?(?:diploma|certificado|constancia)\s+a\:?|A:\s*|Al\s+Sr\.?\(?a?\)?\:?\s*|Conferido\s+a\:?\s*|Certifica\s+que\:?\s*)([A-ZÁÉÍÓÚÑa-zácéíóúñ\s]{5,60})/i);
         if (matchNombreOtorgado && matchNombreOtorgado[1]) {
             const cand = matchNombreOtorgado[1].split(/\r?\n/)[0].replace(/["'”]/g, '').trim();
             if (!esPalabraDeFirma(cand) && cand.split(/\s+/).length >= 2) {
@@ -187,6 +201,9 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
             if (/^[A-ZÁÉÍÓÚÑa-z]{3,}(?:\s+[A-ZÁÉÍÓÚÑa-z]{3,}){1,3}$/.test(line) && 
                 !line.toUpperCase().includes('CERTIFICADO') && 
                 !line.toUpperCase().includes('RECONOCIMIENTO') &&
+                !line.toUpperCase().includes('DIPLOMA') &&
+                !line.toUpperCase().includes('GESTION') &&
+                !line.toUpperCase().includes('PUBLICA') &&
                 !line.toUpperCase().includes('TECSUP') && 
                 !line.toUpperCase().includes('SENATI') && 
                 !line.toUpperCase().includes('SEGURIDAD') && 
@@ -199,12 +216,19 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         }
     }
 
-    // Estrategia 2.4: Si el PDF es un scan cerrado o imagen pura no indexable, extraer el nombre del archivo si contiene nombres
+    // Estrategia 2.4: Si el PDF es un scan cerrado o imagen pura no indexable, extraer el nombre del archivo filtrando códigos y hashes
     if (!nombreTrabajador || nombreTrabajador === 'Trabajador Acreditado') {
         if (filename && typeof filename === 'string') {
-            const raw = filename.replace(/\(Autosaved\)/ig, '').replace(/\.pdf$/i, '');
+            const raw = filename.replace(/\(Autosaved\)/ig, '').replace(/\.pdf$/i, '').replace(/\(\d+\)/g, '');
             const parts = raw.split(/[-_\s]+/);
-            const words = parts.filter(p => /^[a-zA-ZáéíóúÁÉÍÓÚñÑ]{3,}$/.test(p) && !['certificado','constancia','diploma','reconocimiento','pdf'].includes(p.toLowerCase()));
+            // Descartar tokens como JSDSQJDX, GP3, COD123, palabras técnicas
+            const words = parts.filter(p => {
+                const lp = p.toLowerCase();
+                const esRuido = ['certificado','constancia','diploma','reconocimiento','pdf','curso','ia'].includes(lp);
+                const tieneConsonantesRaras = !/[aeiouáéíóú]/i.test(p); // Ej: JSDSQJDX, GP3
+                const tieneDigitos = /\d/.test(p);
+                return p.length >= 3 && /^[a-zA-ZáéíóúÁÉÍÓÚñÑ]+$/.test(p) && !esRuido && !tieneConsonantesRaras && !tieneDigitos;
+            });
             if (words.length >= 2) {
                 nombreTrabajador = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
             }
@@ -213,13 +237,18 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     if (!nombreTrabajador) {
         nombreTrabajador = 'Trabajador Acreditado';
+    } else {
+        // Limpieza de letras o ruidos de 1 carácter al inicio o final provocados por firmas u OCR marginal
+        nombreTrabajador = nombreTrabajador.replace(/^\s*[a-zA-ZáéíóúÁÉÍÓÚñÑ]\s+/g, '').replace(/\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]\s*$/g, '').trim();
     }
 
-    // 3. Extraer Nombre del Curso Normativo Minero (Taxonomía D.S. 024-2016-EM)
+    // 3. Extraer Nombre del Curso Normativo Minero / Especialización
     let nombreCurso = null;
     const upperText = text.toUpperCase();
 
-    if (upperText.includes('TRABAJOS EN ALTURA') || upperText.includes('ALTURA FÍSICA') || upperText.includes('ALTURA FISICA')) {
+    if (upperText.includes('GESTIÓN PÚBLICA') || upperText.includes('GESTION PUBLICA')) {
+        nombreCurso = 'Programa de Especialización en Gestión Pública';
+    } else if (upperText.includes('TRABAJOS EN ALTURA') || upperText.includes('ALTURA FÍSICA') || upperText.includes('ALTURA FISICA')) {
         nombreCurso = 'Seguridad en Trabajos en Altura Física';
     } else if (upperText.includes('ESPACIOS CONFINADOS') || upperText.includes('ESPACIO CONFINADO')) {
         nombreCurso = 'Seguridad en Ingreso a Espacios Confinados';
@@ -248,9 +277,11 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
     } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA') || upperText.includes('DIPLOMADO')) {
         nombreCurso = 'Diplomado en Inteligencia Artificial y Tecnologías Digitales';
     } else {
-        const matchCursoGenerico = text.match(/(?:Programa\s+Integral|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n|Diplomado(?:\s+en|\s+de)?)[\:\s]+([^\n\r;”"]{10,120})/i);
+        const matchCursoGenerico = text.match(/(?:Programa\s+(?:de\s+)?(?:Especializaci[oó]n|Integral)|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n|Diplomado(?:\s+en|\s+de)?)[\:\s]+([^\n\r;”"]{10,120})/i);
         if (matchCursoGenerico) {
             nombreCurso = matchCursoGenerico[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
+        } else if (filename && /GESTION|PUBLICA/i.test(filename)) {
+            nombreCurso = 'Programa de Especialización en Gestión Pública';
         } else if (filename && /IA|INTELIGENCIA|PROGRAMACION|PYTHON|REACT|DESARROLLO/i.test(filename)) {
             nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
         } else {
@@ -260,7 +291,9 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // 4. Extraer Entidad Emisora
     let entidad = 'Centro de Capacitación y Homologación Especializado';
-    if (upperText.includes('MOUREDEV') || upperText.includes('BIG SCHOOL') || (filename && /mouredev|bigschool/i.test(filename))) {
+    if (upperText.includes('ESGOB') || (filename && /esgob/i.test(filename))) {
+        entidad = 'ESGOB - Escuela de Gobierno y Gestión Pública';
+    } else if (upperText.includes('MOUREDEV') || upperText.includes('BIG SCHOOL') || (filename && /mouredev|bigschool/i.test(filename))) {
         entidad = 'MoureDev & BIG School';
     } else if (upperText.includes('ELECTROTECH')) {
         entidad = 'ELECTROTECH - Instituto de Capacitaciones Profesionales';
@@ -282,9 +315,27 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
 
     // 5. Extraer Horas Lectivas
     let horas = 16;
-    const matchHoras = text.match(/(?:DURACI[OÓ]N\s*:?\s*)?(\d+)\s*(?:horas|hrs|Horas|académicas|horas cronológicas)/i) || text.match(/DURACI[OÓ]N\s*:?\s*(\d+)/i);
-    if (matchHoras && matchHoras[1]) {
-        horas = parseInt(matchHoras[1]);
+    if (upperText.includes('DOSCIENTOS CUARENTA') || upperText.includes('240 HORAS')) {
+        horas = 240;
+    } else if (upperText.includes('CIENTO VEINTE') || upperText.includes('120 HORAS')) {
+        horas = 120;
+    } else if (upperText.includes('CIENTO OCHENTA') || upperText.includes('180 HORAS')) {
+        horas = 180;
+    } else if (upperText.includes('NOVENTA') || upperText.includes('90 HORAS')) {
+        horas = 90;
+    } else if (upperText.includes('SESENTA') || upperText.includes('60 HORAS')) {
+        horas = 60;
+    } else if (upperText.includes('CUARENTA Y OCHO') || upperText.includes('48 HORAS')) {
+        horas = 48;
+    } else if (upperText.includes('TREINTA Y DOS') || upperText.includes('32 HORAS')) {
+        horas = 32;
+    } else if (upperText.includes('VEINTICUATRO') || upperText.includes('24 HORAS')) {
+        horas = 24;
+    } else {
+        const matchHoras = text.match(/(?:DURACI[OÓ]N\s*:?\s*)?(\d+)\s*(?:horas|hrs|Horas|académicas|horas cronológicas)/i) || text.match(/DURACI[OÓ]N\s*:?\s*(\d+)/i);
+        if (matchHoras && matchHoras[1]) {
+            horas = parseInt(matchHoras[1]);
+        }
     }
 
     // 6. Extraer Fecha de Emisión

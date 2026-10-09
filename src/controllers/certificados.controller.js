@@ -59,9 +59,28 @@ async function uploadPDFOCR(req, res) {
                  WHERE LOWER(CONCAT(nombres, ' ', apellidos)) = ? 
                     OR LOWER(CONCAT(apellidos, ' ', nombres)) = ?
                     OR (LENGTH(?) > 8 AND LOWER(CONCAT(nombres, ' ', apellidos)) LIKE ?)
+                    OR (LENGTH(?) > 8 AND LOWER(?) LIKE CONCAT('%', LOWER(nombres), '%') AND LOWER(?) LIKE CONCAT('%', LOWER(apellidos), '%'))
+                 ORDER BY (CASE WHEN numero_documento NOT LIKE 'TEMP_%' THEN 1 ELSE 2 END) ASC
                  LIMIT 1`, 
-                [nombrePDFLimpio, nombrePDFLimpio, nombrePDFLimpio, `%${nombrePDFLimpio}%`]
+                [nombrePDFLimpio, nombrePDFLimpio, nombrePDFLimpio, `%${nombrePDFLimpio}%`, nombrePDFLimpio, nombrePDFLimpio, nombrePDFLimpio]
             );
+
+            // Búsqueda inteligente por tokens individuales si aún no coincide
+            if (!trabajador) {
+                const tokens = nombrePDFLimpio.split(/\s+/).filter(t => t.length >= 3 && !['jsdsqjdx','gp3','del','las','los','san'].includes(t));
+                if (tokens.length >= 2) {
+                    const todosTrabajadores = await allDB('SELECT * FROM trabajadores ORDER BY (CASE WHEN numero_documento NOT LIKE "TEMP_%" THEN 1 ELSE 2 END) ASC');
+                    for (const t of todosTrabajadores) {
+                        const nombreCompleto = `${t.nombres} ${t.apellidos}`.toLowerCase();
+                        const coincidencias = tokens.filter(tok => nombreCompleto.includes(tok));
+                        // Si coinciden al menos 2 nombres/apellidos significativos (ej. Christian Ortega o Renato Bernedo)
+                        if (coincidencias.length >= 2 && (coincidencias.length / tokens.length) >= 0.5) {
+                            trabajador = t;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         // 3. Si no existe en trabajadores pero es un Usuario del Sistema (ej. Christian Renato Ortega Bernedo)
@@ -284,9 +303,27 @@ async function uploadBatchPDFOCR(req, res) {
                          WHERE LOWER(CONCAT(nombres, ' ', apellidos)) = ? 
                             OR LOWER(CONCAT(apellidos, ' ', nombres)) = ?
                             OR (LENGTH(?) > 8 AND LOWER(CONCAT(nombres, ' ', apellidos)) LIKE ?)
+                            OR (LENGTH(?) > 8 AND LOWER(?) LIKE CONCAT('%', LOWER(nombres), '%') AND LOWER(?) LIKE CONCAT('%', LOWER(apellidos), '%'))
+                         ORDER BY (CASE WHEN numero_documento NOT LIKE 'TEMP_%' THEN 1 ELSE 2 END) ASC
                          LIMIT 1`,
-                        [nombreLimpio, nombreLimpio, nombreLimpio, `%${nombreLimpio}%`]
+                        [nombreLimpio, nombreLimpio, nombreLimpio, `%${nombreLimpio}%`, nombreLimpio, nombreLimpio, nombreLimpio]
                     );
+
+                    // Búsqueda inteligente por tokens individuales
+                    if (!trabajador) {
+                        const tokens = nombreLimpio.split(/\s+/).filter(t => t.length >= 3 && !['jsdsqjdx','gp3','del','las','los','san'].includes(t));
+                        if (tokens.length >= 2) {
+                            const todosTrabajadores = await allDB('SELECT * FROM trabajadores ORDER BY (CASE WHEN numero_documento NOT LIKE "TEMP_%" THEN 1 ELSE 2 END) ASC');
+                            for (const t of todosTrabajadores) {
+                                const nombreCompleto = `${t.nombres} ${t.apellidos}`.toLowerCase();
+                                const coincidencias = tokens.filter(tok => nombreCompleto.includes(tok));
+                                if (coincidencias.length >= 2 && (coincidencias.length / tokens.length) >= 0.5) {
+                                    trabajador = t;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Si no existe como trabajador pero coincide con un usuario del sistema (ej. Christian Renato Ortega Bernedo)
