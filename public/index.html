@@ -487,10 +487,23 @@
             <div class="glass-card" style="margin-top: 1.5rem;">
                 <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                     <span>📜 Historial Unificado de Certificados Homologados (PDF + Excel)</span>
-                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-                        <button class="btn-primary" onclick="triggerAlertScan()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 700;">📧 Enviar Notificaciones Preventivas (≤90 Días)</button>
-                        <button type="button" class="btn-primary" onclick="limpiarTodoHistorialDesdeUI()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-weight: 700; cursor: pointer;">🗑️ Limpiar Base de Datos</button>
-                        <input type="text" id="filter-certificados-input" onkeyup="filterCertificatesTable()" class="form-control" placeholder="🔍 Filtrar trabajador, curso o DNI..." style="max-width: 250px; font-size: 0.85rem; padding: 0.5rem 0.85rem;">
+                    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                        <select id="filter-completitud-select" onchange="filterCertificatesTable()" class="form-control" style="max-width: 210px; font-size: 0.82rem; padding: 0.45rem 0.75rem; background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.2);">
+                            <option value="TODOS">📋 Todos los Registros</option>
+                            <option value="INCOMPLETOS">⚠️ Información Incompleta (Requiere Regularización)</option>
+                            <option value="COMPLETOS">✅ Información Completa (100% Expediente)</option>
+                            <option value="SIN_DNI">🪪 Sin DNI Oficial</option>
+                            <option value="SIN_PDF">📄 Sin Archivo PDF (80%)</option>
+                            <option value="SIN_CORREO">✉️ Sin Correo Personal</option>
+                            <option value="SIN_TELEFONO">📞 Sin Teléfono</option>
+                        </select>
+                        <button class="btn-primary" id="btn-notificar-masivo-incompletos" onclick="enviarNotificacionMasivaIncompletosJS()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Enviar correo a todos los trabajadores observados para que regularicen">
+                            <span>📢 Notificar Masivo para Regularizar</span>
+                            <span id="badge-count-incompletos" style="background: rgba(0,0,0,0.3); color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 0.75rem;">0</span>
+                        </button>
+                        <button class="btn-primary" onclick="triggerAlertScan()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8; font-weight: 700;">📧 Alertas Vencimiento (≤90d)</button>
+                        <button type="button" class="btn-primary" onclick="limpiarTodoHistorialDesdeUI()" style="font-size: 0.8rem; padding: 0.5rem 0.95rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-weight: 700; cursor: pointer;">🗑️ Limpiar BD</button>
+                        <input type="text" id="filter-certificados-input" onkeyup="filterCertificatesTable()" class="form-control" placeholder="🔍 Filtrar nombre, DNI, curso..." style="max-width: 210px; font-size: 0.82rem; padding: 0.45rem 0.75rem;">
                     </div>
                 </div>
                 <div class="table-responsive">

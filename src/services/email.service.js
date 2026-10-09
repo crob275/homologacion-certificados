@@ -706,27 +706,31 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
     let tituloBanner = '¡TIENES PASE AUTORIZADO PARA PLANTA!';
     let explicacionHTML = '';
 
-    const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
+    const dniEsTemporal = !trabajador.numero_documento || trabajador.numero_documento.startsWith('TEMP_') || trabajador.numero_documento.length !== 8;
+    const faltaCorreoReal = !trabajador.email_personal || !trabajador.email_personal.includes('@') || trabajador.email_personal.includes('powered@') || trabajador.email_personal.includes('operario.') || trabajador.email_personal.startsWith('TEMP_');
+    const faltaTelefonoReal = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || trabajador.telefono_personal.trim() === '';
     const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
     const faltaPDFSustento = !tienePDFReal;
-    const faltaDatos = dniEsTemporal || faltaPDFSustento;
+    const faltaDatos = dniEsTemporal || faltaPDFSustento || faltaCorreoReal || faltaTelefonoReal;
 
     if (faltaDatos) {
         estadoKey = 'PENDIENTE_REGULARIZAR';
-        estadoLabel = '⚠️ REGISTRO PROVISIONAL (80% COMPLETADO - FALTA SUSTENTO PDF)';
+        estadoLabel = '⚠️ REGISTRO OBSERVADO / INCOMPLETO (FALTA REGULARIZACIÓN)';
         bannerGrad = 'linear-gradient(135deg, #d97706, #b45309)';
         colorTextoBanner = '#ffffff';
         iconoBanner = '📎';
-        tituloBanner = 'CERTIFICADO REGISTRADO - FALTA ADJUNTAR SUSTENTO EN PDF';
+        tituloBanner = 'DATOS PENDIENTES DE REGULARIZAR PARA HOMOLOGACIÓN MINERA';
         explicacionHTML = `
             <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #fde68a; display: block; margin-bottom: 6px;">⚠️ ADVERTENCIA OBLIGATORIA (AUDITORÍA HSE D.S. 024-2016-EM):</strong>
-                Tus datos de curso para <strong>${certificado.nombre_curso}</strong> fueron cargados por matriz administrativa, pero <strong>el registro está al 80% y requiere regularización</strong> antes de emitir tu acreditación definitiva:<br>
+                <strong style="color: #fde68a; display: block; margin-bottom: 6px;">⚠️ REQUERIMIENTO OBLIGATORIO DE REGULARIZACIÓN (D.S. 024-2016-EM):</strong>
+                Se ha detectado que tu expediente para el curso <strong>${certificado.nombre_curso}</strong> se encuentra <strong>incompleto o con datos provisionales</strong>. Favor subsanar los siguientes puntos:<br>
                 <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6;">
-                    ${faltaPDFSustento ? '<li><strong>📎 Falta adjuntar archivo PDF original:</strong> Se registró por planilla/Excel pero aún no se ha cargado el documento digital escaneado del diploma para auditoría en garita.</li>' : ''}
-                    ${dniEsTemporal ? '<li><strong>Falta DNI oficial:</strong> Se asignó un identificador provisional (' + trabajador.numero_documento + ').</li>' : ''}
+                    ${dniEsTemporal ? '<li><strong>🪪 DNI no acreditado:</strong> Se cuenta con un código temporal (' + (trabajador.numero_documento || 'Sin DNI') + '). Se requiere tu DNI oficial de 8 dígitos.</li>' : ''}
+                    ${faltaPDFSustento ? '<li><strong>📄 Falta archivo PDF original:</strong> Se requiere adjuntar el certificado escaneado original para sustento legal en garita.</li>' : ''}
+                    ${faltaCorreoReal ? '<li><strong>✉️ Correo personal no registrado:</strong> Se requiere registrar un correo válido para alertas de vigencia y pases.</li>' : ''}
+                    ${faltaTelefonoReal ? '<li><strong>📞 Teléfono no registrado:</strong> Se requiere número de contacto para emergencias y coordinación.</li>' : ''}
                 </ul>
-                👉 <strong>¿Qué debes hacer?:</strong> Comunícate con tu empresa contratista (<strong>${empresa.razon_social}</strong>) o sube tu diploma en la sección <code>[ Carga de Cuadrillas & OCR ]</code> para anexar el PDF original a tu expediente.
+                👉 <strong>¿Cómo regularizar?:</strong> Coordina con tu empresa contratista (<strong>${empresa.razon_social}</strong>) o acércate a la oficina de Homologaciones HSE para actualizar tus datos y subir tu sustento PDF.
             </div>
         `;
     } else if (diasRestantes <= 0) {
@@ -875,16 +879,16 @@ async function enviarNotificacionIndividualTrabajador(params) {
         diasRestantes = Math.ceil((fVenc.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    const dniEsTemporal = trabajador.numero_documento && trabajador.numero_documento.startsWith('TEMP_');
+    const dniEsTemporal = !trabajador.numero_documento || trabajador.numero_documento.startsWith('TEMP_') || trabajador.numero_documento.length !== 8;
+    const faltaCorreoReal = !trabajador.email_personal || !trabajador.email_personal.includes('@') || trabajador.email_personal.includes('powered@') || trabajador.email_personal.includes('operario.') || trabajador.email_personal.startsWith('TEMP_');
+    const faltaTelefonoReal = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || trabajador.telefono_personal.trim() === '';
     const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
     const faltaPDFSustento = !tienePDFReal;
-    const faltaDatos = dniEsTemporal || faltaPDFSustento;
+    const faltaDatos = dniEsTemporal || faltaPDFSustento || faltaCorreoReal || faltaTelefonoReal;
 
     let asunto = '';
-    if (faltaPDFSustento) {
-        asunto = `⚠️ [REGISTRO PROVISIONAL 80%] Falta Adjuntar Certificado en PDF - Curso: ${certificado.nombre_curso} (${trabajador.nombres} ${trabajador.apellidos})`;
-    } else if (faltaDatos) {
-        asunto = `⚠️ [REGISTRO PROVISIONAL 80%] Certificado de ${certificado.nombre_curso} - Faltan Datos por Regularizar (${trabajador.nombres} ${trabajador.apellidos})`;
+    if (faltaDatos) {
+        asunto = `⚠️ [REGULARIZACIÓN OBLIGATORIA] Expediente Observado para ${certificado.nombre_curso} - (${trabajador.nombres} ${trabajador.apellidos})`;
     } else if (diasRestantes <= 0) {
         asunto = `⛔ [ACCESO DENEGADO] Certificado Vencido de ${certificado.nombre_curso} - Pase Inhabilitado en Garita`;
     } else if (diasRestantes <= 90) {
@@ -893,7 +897,10 @@ async function enviarNotificacionIndividualTrabajador(params) {
         asunto = `✅ [PASE AUTORIZADO] Tu Certificado de ${certificado.nombre_curso} está Aprobado y Vigente`;
     }
 
-    const emailTrabajador = trabajador.email_personal || `${trabajador.numero_documento}@gmail.com`;
+    const emailTrabajador = trabajador.email_personal;
+    if (!emailTrabajador || !emailTrabajador.includes('@') || emailTrabajador.includes('powered@') || emailTrabajador.includes('operario.')) {
+        throw new Error(`El trabajador ${trabajador.nombres} ${trabajador.apellidos} no cuenta con un correo electrónico real registrado para despachar la notificación.`);
+    }
 
     const cuerpoHTML = generarHTMLCorreoIndividualTrabajador({
         trabajador,
@@ -1113,6 +1120,81 @@ async function obtenerHistorialAlertas(empresaIdFiltro = null) {
     return await allDB(query, params);
 }
 
+async function enviarNotificacionesMasivasIncompletos({ empresaId = null, remitenteNombre = 'Auditoría HSE', remitenteRol = 'SUPERVISOR HSE', remitenteEmail = null }) {
+    let query = `
+        SELECT c.*, 
+               t.id AS trab_id, t.nombres AS trab_nombres, t.apellidos AS trab_apellidos, 
+               t.numero_documento AS trab_doc, t.email_personal AS trab_email, t.telefono_personal AS trab_telefono,
+               e.id AS emp_id, e.razon_social AS emp_nombre, e.email_contacto AS emp_email
+        FROM certificados c
+        JOIN trabajadores t ON c.trabajador_id = t.id
+        JOIN empresas e ON c.empresa_id = e.id
+    `;
+    let params = [];
+    if (empresaId) {
+        query += ` WHERE c.empresa_id = ? `;
+        params.push(empresaId);
+    }
+    query += ` ORDER BY c.created_at DESC `;
+
+    const certs = await allDB(query, params);
+    const enviados = [];
+    const omitidos = [];
+
+    for (const c of certs) {
+        const dniEsTemporal = !c.trab_doc || c.trab_doc.startsWith('TEMP_') || c.trab_doc.length !== 8;
+        const faltaCorreoReal = !c.trab_email || !c.trab_email.includes('@') || c.trab_email.includes('powered@') || c.trab_email.includes('operario.') || c.trab_email.startsWith('TEMP_');
+        const faltaTelefonoReal = !c.trab_telefono || c.trab_telefono === '+51 987654321' || c.trab_telefono === '+51 900000000' || c.trab_telefono.trim() === '';
+        const tienePDFReal = Boolean(c.url_pdf_storage || (c.pdf_filename && c.pdf_filename.toLowerCase().endsWith('.pdf') && !c.pdf_filename.includes('Excel')));
+        const faltaPDF = !tienePDFReal;
+        const estaIncompleto = dniEsTemporal || faltaCorreoReal || faltaTelefonoReal || faltaPDF;
+
+        if (!estaIncompleto) {
+            continue; // Expediente 100% completo, no requiere regularización
+        }
+
+        // Para poder enviar el correo de regularización, se necesita tener un correo registrado
+        if (faltaCorreoReal) {
+            omitidos.push({
+                certificado_id: c.id,
+                trabajador: `${c.trab_nombres} ${c.trab_apellidos}`,
+                motivo: 'No tiene correo electrónico personal registrado en el sistema para recibir la notificación.'
+            });
+            continue;
+        }
+
+        try {
+            const resEnvio = await enviarNotificacionIndividualTrabajador({
+                certificadoId: c.id,
+                remitenteNombre,
+                remitenteRol,
+                remitenteEmail: remitenteEmail || c.emp_email
+            });
+            enviados.push({
+                certificado_id: c.id,
+                trabajador: `${c.trab_nombres} ${c.trab_apellidos}`,
+                email: c.trab_email,
+                curso: c.nombre_curso,
+                id_alerta: resEnvio.id
+            });
+        } catch (errEnvio) {
+            omitidos.push({
+                certificado_id: c.id,
+                trabajador: `${c.trab_nombres} ${c.trab_apellidos}`,
+                motivo: errEnvio.message
+            });
+        }
+    }
+
+    return {
+        total_evaluados: certs.length,
+        total_enviados: enviados.length,
+        total_omitidos: omitidos.length,
+        enviados,
+        omitidos
+    };
+}
+
 module.exports = {
     setCorreoPruebaRedireccion,
     getCorreoPruebaRedireccion,
@@ -1120,6 +1202,7 @@ module.exports = {
     enviarAlertaIndividual,
     ejecutarEscaneoAlertas90Dias,
     ejecutarEscaneoAlertasEscalonadas,
+    enviarNotificacionesMasivasIncompletos,
     obtenerHistorialAlertas,
     formatFechaLimpia,
     enviarNotificacionIndividualTrabajador,

@@ -92,11 +92,45 @@ function handleFileSelected(type) {
 }
 
 function filterCertificatesTable() {
-    const filter = document.getElementById('filter-certificados-input').value.toLowerCase();
+    const textFilter = (document.getElementById('filter-certificados-input')?.value || '').toLowerCase().trim();
+    const completitudFilter = document.getElementById('filter-completitud-select')?.value || 'TODOS';
     const rows = document.querySelectorAll('#tbody-certificados tr');
+
+    let visibleCount = 0;
     rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
+        // Ignorar fila de "No hay certificados"
+        if (row.cells && row.cells.length <= 1) return;
+
+        const rowText = row.textContent.toLowerCase();
+        const matchesText = !textFilter || rowText.includes(textFilter);
+
+        const tienePdf = row.getAttribute('data-tiene-pdf') === 'true';
+        const tieneDni = row.getAttribute('data-tiene-dni') === 'true';
+        const tieneEmail = row.getAttribute('data-tiene-email') === 'true';
+        const tieneTel = row.getAttribute('data-tiene-tel') === 'true';
+        const esIncompleto = row.getAttribute('data-incompleto') === 'true';
+
+        let matchesCompletitud = true;
+        if (completitudFilter === 'INCOMPLETOS') {
+            matchesCompletitud = esIncompleto;
+        } else if (completitudFilter === 'COMPLETOS') {
+            matchesCompletitud = !esIncompleto;
+        } else if (completitudFilter === 'SIN_DNI') {
+            matchesCompletitud = !tieneDni;
+        } else if (completitudFilter === 'SIN_PDF') {
+            matchesCompletitud = !tienePdf;
+        } else if (completitudFilter === 'SIN_CORREO') {
+            matchesCompletitud = !tieneEmail;
+        } else if (completitudFilter === 'SIN_TELEFONO') {
+            matchesCompletitud = !tieneTel;
+        }
+
+        if (matchesText && matchesCompletitud) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
     });
 }
 
@@ -1317,20 +1351,25 @@ async function loadCertificados() {
             }
 
             const tienePDFReal = Boolean(c.url_pdf_storage || (c.pdf_filename && !c.pdf_filename.includes('Excel')));
+            const tieneDNIOficial = Boolean(c.trabajador_doc && !c.trabajador_doc.startsWith('TEMP_') && c.trabajador_doc.length === 8);
+            const tieneEmailValido = Boolean(c.trabajador_email && !c.trabajador_email.includes('powered@') && !c.trabajador_email.includes('operario.') && c.trabajador_email.includes('@'));
+            const tieneTelValido = Boolean(c.trabajador_telefono && c.trabajador_telefono !== '+51 987654321' && c.trabajador_telefono !== '+51 900000000');
+            const estaIncompleto = !tienePDFReal || !tieneDNIOficial || !tieneEmailValido || !tieneTelValido;
+
             const badgeAudit = tienePDFReal 
                 ? `<span class="badge ${c.estado_validacion === 'APROBADO' ? 'badge-success' : (c.estado_validacion === 'RECHAZADO' ? 'badge-danger' : 'badge-warning')}">${c.estado_validacion}</span>`
                 : `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);" title="Expediente con 80% completado. Falta adjuntar archivo PDF escaneado.">⚠️ 80% PROVISIONAL</span>`;
 
             return `
-                <tr>
+                <tr data-tiene-pdf="${tienePDFReal}" data-tiene-dni="${tieneDNIOficial}" data-tiene-email="${tieneEmailValido}" data-tiene-tel="${tieneTelValido}" data-incompleto="${estaIncompleto}">
                     <td><strong>${c.nombre_curso || c.curso || 'Curso de Homologación'}</strong></td>
                     <td>
                         <strong>${c.trabajador_nombre}</strong><br>
                         <small style="color: var(--text-secondary)">Doc: ${c.trabajador_doc}</small><br>
-                        ${(c.trabajador_email && !c.trabajador_email.includes('powered@') && !c.trabajador_email.includes('operario.')) 
+                        ${tieneEmailValido 
                             ? `<small style="color: var(--accent-blue)">✉️ ${c.trabajador_email}</small>` 
                             : `<button type="button" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; margin-bottom: 2px;" title="Correo no registrado. Clic para ingresar correo personal.">✉️ Registrar Correo</button>`}<br>
-                        ${(c.trabajador_telefono && c.trabajador_telefono !== '+51 987654321' && c.trabajador_telefono !== '+51 900000000') 
+                        ${tieneTelValido 
                             ? `<small style="color: var(--success)">📞 ${c.trabajador_telefono}</small>` 
                             : `<button type="button" onclick="abrirModalEditarTrabajador('${c.trabajador_id}')" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; margin-top: 2px;" title="Teléfono no registrado. Clic para ingresar número real.">⚠️ Registrar Teléfono</button>`}
                     </td>
@@ -1378,6 +1417,21 @@ async function loadCertificados() {
                 </tr>
             `;
         }).join('');
+
+        // Actualizar contador de incompletos para el botón de notificación masiva
+        const incompletosTotal = certs.filter(c => {
+            const tienePDFReal = Boolean(c.url_pdf_storage || (c.pdf_filename && !c.pdf_filename.includes('Excel')));
+            const tieneDNIOficial = Boolean(c.trabajador_doc && !c.trabajador_doc.startsWith('TEMP_') && c.trabajador_doc.length === 8);
+            const tieneEmailValido = Boolean(c.trabajador_email && !c.trabajador_email.includes('powered@') && !c.trabajador_email.includes('operario.') && c.trabajador_email.includes('@'));
+            const tieneTelValido = Boolean(c.trabajador_telefono && c.trabajador_telefono !== '+51 987654321' && c.trabajador_telefono !== '+51 900000000');
+            return !tienePDFReal || !tieneDNIOficial || !tieneEmailValido || !tieneTelValido;
+        }).length;
+
+        const badgeCount = document.getElementById('badge-count-incompletos');
+        if (badgeCount) badgeCount.textContent = incompletosTotal;
+
+        // Re-aplicar filtro visual actual
+        filterCertificatesTable();
     } catch (err) {
         console.error('Error loading certificados:', err);
     }
@@ -1400,6 +1454,62 @@ async function enviarAlertaIndividualJS(certId) {
         loadAlertasLog();
     } catch (err) {
         alert('Error: ' + err.message);
+    }
+async function enviarNotificacionMasivaIncompletosJS() {
+    const incompletosCount = parseInt(document.getElementById('badge-count-incompletos')?.textContent || '0', 10);
+    if (incompletosCount === 0) {
+        return alert('¡Excelente! No hay trabajadores con información incompleta en este momento. Todos los expedientes cuentan con DNI, PDF, Correo y Teléfono.');
+    }
+
+    if (!confirm(`⚠️ NOTIFICACIÓN MASIVA DE REGULARIZACIÓN:\n\nSe detectaron ${incompletosCount} certificados con expedientes incompletos u observados (falta DNI, sustento PDF, correo o teléfono).\n\n¿Desea despachar la notificación oficial por correo a los trabajadores y a la empresa para que regularicen su expediente?`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btn-notificar-masivo-incompletos');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span>⏳ Enviando correos masivos...</span>`;
+    }
+
+    try {
+        const empId = empresaActivaId || (esUsuarioEmpresa() ? usuarioSesionActivo.empresa_id : null);
+        const res = await fetch('/api/v1/alertas/enviar-masivo-incompletos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                empresa_id: empId,
+                remitente_nombre: usuarioSesionActivo ? usuarioSesionActivo.nombre_completo : 'Auditoría HSE',
+                remitente_rol: usuarioSesionActivo ? usuarioSesionActivo.rol : 'SUPERVISOR HSE',
+                remitente_email: usuarioSesionActivo ? usuarioSesionActivo.email : null
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al enviar notificaciones masivas.');
+
+        let msg = `✅ RESULTADO DE NOTIFICACIÓN MASIVA:\n\n`;
+        msg += `• Total evaluados: ${data.total_evaluados}\n`;
+        msg += `• Correos despachados con éxito: ${data.total_enviados}\n`;
+        if (data.total_omitidos > 0) {
+            msg += `• Omitidos (sin correo registrado): ${data.total_omitidos}\n\n`;
+            msg += `Detalle de omitidos:\n`;
+            data.omitidos.slice(0, 5).forEach(o => {
+                msg += ` - ${o.trabajador}: ${o.motivo}\n`;
+            });
+            if (data.omitidos.length > 5) msg += ` ... y ${data.omitidos.length - 5} más.\n`;
+        }
+        alert(msg);
+
+        loadCertificados();
+        loadAlertasLog();
+    } catch (err) {
+        alert('Error en notificación masiva: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 }
 
@@ -2305,6 +2415,8 @@ window.handleSaveTrabajadorEdit = handleSaveTrabajadorEdit;
 window.handleFotoSeleccionada = handleFotoSeleccionada;
 window.removerFotoPerfil = removerFotoPerfil;
 window.eliminarCertificadoJS = eliminarCertificadoJS;
+window.enviarNotificacionMasivaIncompletosJS = enviarNotificacionMasivaIncompletosJS;
+window.filterCertificatesTable = filterCertificatesTable;
 
 // =========================================================================
 // MÓDULO FRONTEND: SOLICITUDES DE CORRECCIÓN (TRABAJADOR <-> ADMIN)

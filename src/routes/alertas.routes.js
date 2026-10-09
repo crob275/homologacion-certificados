@@ -105,6 +105,24 @@ router.post('/enviar-individual', async (req, res) => {
     }
 });
 
+// Enviar notificaciones masivas a todos los trabajadores con expedientes incompletos / por regularizar
+router.post('/enviar-masivo-incompletos', async (req, res) => {
+    try {
+        const { empresa_id, remitente_nombre, remitente_rol, remitente_email } = req.body;
+        const { enviarNotificacionesMasivasIncompletos } = require('../services/email.service');
+        const resultado = await enviarNotificacionesMasivasIncompletos({
+            empresaId: empresa_id || null,
+            remitenteNombre: remitente_nombre || 'Auditoría HomologaControl HSE',
+            remitenteRol: remitente_rol || 'SUPERVISOR HSE',
+            remitenteEmail: remitente_email || null
+        });
+        res.json(resultado);
+    } catch (err) {
+        console.error('Error enviando notificaciones masivas de incompletos:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Configurar casilla de redirección para pruebas
 router.post('/configurar-correo-prueba', (req, res) => {
     const { email } = req.body;
