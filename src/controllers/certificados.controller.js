@@ -144,19 +144,21 @@ async function uploadPDFOCR(req, res) {
         const empresa = await getDB('SELECT * FROM empresas WHERE id = ?', [empresaSeleccionadaId]) || await getDB('SELECT * FROM empresas WHERE id = ?', [trabajador.empresa_id]) || await getDB('SELECT * FROM empresas ORDER BY created_at ASC LIMIT 1');
         const fechaVencimiento = calcularFechaVencimiento(extracted.fechaEmision);
 
-        // Prevenir duplicidad de certificados: Buscar si el trabajador ya tiene este curso (incluso cargado antes por Excel)
+        // Prevenir duplicidad de certificados: Buscar si el trabajador ya tiene EXACTAMENTE este curso (incluso cargado antes por Excel)
         const cleanNombreCurso = extracted.nombreCurso.trim();
-        let certExistente = await getDB(`
-            SELECT * FROM certificados 
-            WHERE trabajador_id = ? 
-              AND (
-                  LOWER(TRIM(nombre_curso)) = LOWER(?)
-                  OR LOWER(TRIM(nombre_curso)) LIKE LOWER(?)
-                  OR LOWER(?) LIKE LOWER(CONCAT('%', TRIM(nombre_curso), '%'))
-                  OR pdf_filename = ?
-              )
-            ORDER BY created_at DESC LIMIT 1
-        `, [trabajador.id, cleanNombreCurso, `%${cleanNombreCurso}%`, cleanNombreCurso, filename]);
+        let certExistente = null;
+        if (cleanNombreCurso.length >= 6) {
+            certExistente = await getDB(`
+                SELECT * FROM certificados 
+                WHERE trabajador_id = ? 
+                  AND (
+                      LOWER(TRIM(nombre_curso)) = LOWER(?)
+                      OR (LENGTH(?) > 10 AND LOWER(TRIM(nombre_curso)) LIKE LOWER(?))
+                      OR (LENGTH(?) > 10 AND LOWER(?) LIKE LOWER(CONCAT('%', TRIM(nombre_curso), '%')))
+                  )
+                ORDER BY created_at DESC LIMIT 1
+            `, [trabajador.id, cleanNombreCurso, cleanNombreCurso, `%${cleanNombreCurso}%`, cleanNombreCurso, cleanNombreCurso]);
+        }
 
         // Almacenar respaldo en Base64 en la base de datos (url_pdf_storage) para que sobreviva permanentemente en la nube
         let pdfBase64 = null;
@@ -374,17 +376,19 @@ async function uploadBatchPDFOCR(req, res) {
 
                 // 2. Prevenir duplicidad de certificado por curso (vincular con curso previo cargado por Excel)
                 const cleanCursoBatch = extracted.nombreCurso.trim();
-                let certExistente = await getDB(`
-                    SELECT * FROM certificados 
-                    WHERE trabajador_id = ? 
-                      AND (
-                          LOWER(TRIM(nombre_curso)) = LOWER(?)
-                          OR LOWER(TRIM(nombre_curso)) LIKE LOWER(?)
-                          OR LOWER(?) LIKE LOWER(CONCAT('%', TRIM(nombre_curso), '%'))
-                          OR pdf_filename = ?
-                      )
-                    ORDER BY created_at DESC LIMIT 1
-                `, [trabajador.id, cleanCursoBatch, `%${cleanCursoBatch}%`, cleanCursoBatch, file.filename]);
+                let certExistente = null;
+                if (cleanCursoBatch.length >= 6) {
+                    certExistente = await getDB(`
+                        SELECT * FROM certificados 
+                        WHERE trabajador_id = ? 
+                          AND (
+                              LOWER(TRIM(nombre_curso)) = LOWER(?)
+                              OR (LENGTH(?) > 10 AND LOWER(TRIM(nombre_curso)) LIKE LOWER(?))
+                              OR (LENGTH(?) > 10 AND LOWER(?) LIKE LOWER(CONCAT('%', TRIM(nombre_curso), '%')))
+                          )
+                        ORDER BY created_at DESC LIMIT 1
+                    `, [trabajador.id, cleanCursoBatch, cleanCursoBatch, `%${cleanCursoBatch}%`, cleanCursoBatch, cleanCursoBatch]);
+                }
 
                 let batchBase64 = null;
                 if (pdfBuffer && pdfBuffer.length > 0) {

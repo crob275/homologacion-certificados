@@ -246,8 +246,16 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
     let nombreCurso = null;
     const upperText = text.toUpperCase();
 
-    if (upperText.includes('GESTIÓN PÚBLICA') || upperText.includes('GESTION PUBLICA')) {
+    // Detección directa de programas de especialización (fórmula oficial: "programa de especialización en ...")
+    const matchEspecializacion = text.match(/(?:programa\s+de\s+especializaci[oó]n\s+en|diplomado\s+en|curso\s+de\s+especializaci[oó]n\s+en)[\s\:\-]+([^\n\r\.;”"]{5,100})/i);
+
+    if (upperText.includes('SIAF') || upperText.includes('ADMINISTRACION FINANCIERA') || upperText.includes('ADMINISTRACIÓN FINANCIERA')) {
+        nombreCurso = 'Programa de Especialización en SIAF - Sistema Integrado de Administración Financiera';
+    } else if (upperText.includes('GESTIÓN PÚBLICA') || upperText.includes('GESTION PUBLICA')) {
         nombreCurso = 'Programa de Especialización en Gestión Pública';
+    } else if (matchEspecializacion && matchEspecializacion[1] && matchEspecializacion[1].trim().length > 4) {
+        const espClean = matchEspecializacion[1].trim().replace(/\s+/g, ' ');
+        nombreCurso = `Programa de Especialización en ${espClean}`;
     } else if (upperText.includes('TRABAJOS EN ALTURA') || upperText.includes('ALTURA FÍSICA') || upperText.includes('ALTURA FISICA')) {
         nombreCurso = 'Seguridad en Trabajos en Altura Física';
     } else if (upperText.includes('ESPACIOS CONFINADOS') || upperText.includes('ESPACIO CONFINADO')) {
@@ -272,9 +280,9 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
         nombreCurso = 'Manejo Defensivo y Operación en Unidad Minera';
     } else if (upperText.includes('INDUCCIÓN GENERAL') || upperText.includes('INDUCCION GENERAL') || upperText.includes('ANEXO 6') || upperText.includes('ANEXO 4') || upperText.includes('ANEXO 5')) {
         nombreCurso = 'Inducción y Capacitación General de Seguridad Minera (Anexo 6)';
-    } else if (upperText.includes('DESARROLLO CON IA') || upperText.includes('INICIACIÓN AL DESARROLLO CON IA') || upperText.includes('INICIACION AL DESARROLLO CON IA') || (filename && filename.toUpperCase().includes('DESARROLLO') && filename.toUpperCase().includes('IA'))) {
+    } else if (upperText.includes('DESARROLLO CON IA') || upperText.includes('INICIACIÓN AL DESARROLLO CON IA') || upperText.includes('INICIACION AL DESARROLLO CON IA')) {
         nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
-    } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA') || upperText.includes('DIPLOMADO')) {
+    } else if (upperText.includes('INTELIGENCIA ARTIFICIAL') || upperText.includes('DIPLOMADO DE INTELIGENCIA')) {
         nombreCurso = 'Diplomado en Inteligencia Artificial y Tecnologías Digitales';
     } else {
         const matchCursoGenerico = text.match(/(?:Programa\s+(?:de\s+)?(?:Especializaci[oó]n|Integral)|CURSO\s+ESPECIALIDAD|CURSO|Curso|Capacitaci[oó]n|Taller|Especializaci[oó]n|Diplomado(?:\s+en|\s+de)?)[\:\s]+([^\n\r;”"]{10,120})/i);
@@ -282,6 +290,8 @@ async function extraerMetadatosRealPDF(pdfBuffer, filename) {
             nombreCurso = matchCursoGenerico[0].replace(/\r?\n/g, ' ').replace(/["'”]/g, '').trim();
         } else if (filename && /GESTION|PUBLICA/i.test(filename)) {
             nombreCurso = 'Programa de Especialización en Gestión Pública';
+        } else if (filename && /SIAF/i.test(filename)) {
+            nombreCurso = 'Programa de Especialización en SIAF - Sistema Integrado de Administración Financiera';
         } else if (filename && /IA|INTELIGENCIA|PROGRAMACION|PYTHON|REACT|DESARROLLO/i.test(filename)) {
             nombreCurso = 'Curso de Iniciación al Desarrollo con IA';
         } else {
