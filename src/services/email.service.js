@@ -707,64 +707,71 @@ function generarHTMLCorreoIndividualTrabajador({ trabajador, certificado, empres
     let explicacionHTML = '';
 
     const dniEsTemporal = !trabajador.numero_documento || trabajador.numero_documento.startsWith('TEMP_') || trabajador.numero_documento.length !== 8;
-    const faltaCorreoReal = !trabajador.email_personal || !trabajador.email_personal.includes('@') || trabajador.email_personal.includes('powered@') || trabajador.email_personal.includes('operario.') || trabajador.email_personal.startsWith('TEMP_');
-    const faltaTelefonoReal = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || trabajador.telefono_personal.trim() === '';
     const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
     const faltaPDFSustento = !tienePDFReal;
-    const faltaDatos = dniEsTemporal || faltaPDFSustento || faltaCorreoReal || faltaTelefonoReal;
+    
+    // Solo se considera formalmente OBSERVAR el expediente si falta el DNI oficial o falta el PDF físico
+    const expedienteObservadoLegal = dniEsTemporal || faltaPDFSustento;
 
-    if (faltaDatos) {
+    const faltaTelefonoSecundario = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || trabajador.telefono_personal.trim() === '';
+
+    if (expedienteObservadoLegal) {
         estadoKey = 'PENDIENTE_REGULARIZAR';
-        estadoLabel = '⚠️ REGISTRO OBSERVADO / INCOMPLETO (FALTA REGULARIZACIÓN)';
+        estadoLabel = '⚠️ EXPEDIENTE EN REVISIÓN DOCUMENTARIA';
         bannerGrad = 'linear-gradient(135deg, #d97706, #b45309)';
         colorTextoBanner = '#ffffff';
         iconoBanner = '📎';
-        tituloBanner = 'DATOS PENDIENTES DE REGULARIZAR PARA HOMOLOGACIÓN MINERA';
+        tituloBanner = 'REQUERIMIENTO DE REGULARIZACIÓN DOCUMENTAL (D.S. 024-2016-EM)';
         explicacionHTML = `
-            <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #fde68a; display: block; margin-bottom: 6px;">⚠️ REQUERIMIENTO OBLIGATORIO DE REGULARIZACIÓN (D.S. 024-2016-EM):</strong>
-                Se ha detectado que tu expediente para el curso <strong>${certificado.nombre_curso}</strong> se encuentra <strong>incompleto o con datos provisionales</strong>. Favor subsanar los siguientes puntos:<br>
+            <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 8px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
+                <strong style="color: #fde68a; display: block; margin-bottom: 6px; font-size: 14px;">📋 ESTADO DE AUDITORÍA: TRÁMITE DOCUMENTAL EN CURSO</strong>
+                Te informamos que tu registro para la acreditación en <strong>${certificado.nombre_curso}</strong> se encuentra en proceso de validación final. Para completar el expediente formal de homologación minera, se requiere presentar:<br>
                 <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6;">
-                    ${dniEsTemporal ? '<li><strong>🪪 DNI no acreditado:</strong> Se cuenta con un código temporal (' + (trabajador.numero_documento || 'Sin DNI') + '). Se requiere tu DNI oficial de 8 dígitos.</li>' : ''}
-                    ${faltaPDFSustento ? '<li><strong>📄 Falta archivo PDF original:</strong> Se requiere adjuntar el certificado escaneado original para sustento legal en garita.</li>' : ''}
-                    ${faltaCorreoReal ? '<li><strong>✉️ Correo personal no registrado:</strong> Se requiere registrar un correo válido para alertas de vigencia y pases.</li>' : ''}
-                    ${faltaTelefonoReal ? '<li><strong>📞 Teléfono no registrado:</strong> Se requiere número de contacto para emergencias y coordinación.</li>' : ''}
+                    ${dniEsTemporal ? '<li><strong>Documento de Identidad:</strong> Acreditar DNI oficial de 8 dígitos para registro biométrico en garita.</li>' : ''}
+                    ${faltaPDFSustento ? '<li><strong>Sustento Digital:</strong> Adjuntar el diploma/certificado original escaneado en PDF para archivo digital auditable.</li>' : ''}
                 </ul>
-                👉 <strong>¿Cómo regularizar?:</strong> Coordina con tu empresa contratista (<strong>${empresa.razon_social}</strong>) o acércate a la oficina de Homologaciones HSE para actualizar tus datos y subir tu sustento PDF.
+                👉 <strong>Procedimiento:</strong> Coordina con el área de Seguridad y Salud en el Trabajo de tu empresa contratista (<strong>${empresa.razon_social}</strong>) para la validación final.
             </div>
         `;
     } else if (diasRestantes <= 0) {
         estadoKey = 'VENCIDO';
-        estadoLabel = '⛔ NO APTO (VENCIDO)';
+        estadoLabel = '⛔ NO APTO (CICLO DE VIGENCIA CUMPLIDO)';
         bannerGrad = 'linear-gradient(135deg, #be123c, #e11d48)';
         colorTextoBanner = '#ffffff';
         iconoBanner = '🚫';
-        tituloBanner = 'ACCESO RESTRINGIDO EN GARITA DE CONTROL';
+        tituloBanner = 'CERTIFICADO VENCIDO - PROGRAMAR REENTRENAMIENTO';
         explicacionHTML = `
-            <div style="background: rgba(225, 29, 72, 0.15); border-left: 4px solid #f43f5e; padding: 12px 16px; border-radius: 6px; color: #fecdd3; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #fda4af; display: block; margin-bottom: 4px;">¿Por qué fuiste observado y cuál es tu estatus en garita?:</strong>
-                El D.S. 024-2016-EM exige que las capacitaciones críticas en minería se renueven anualmente. Al haber vencido tu certificado, el sistema ha colocado tu pase en estado <strong>⛔ INHABILITADO</strong>. En la garita de control tu ingreso a planta será <strong>REBOTADO / DENEGADO</strong> hasta que apruebes el reentrenamiento y tu empresa suba el nuevo certificado a la plataforma.<br><br>
-                👉 <strong>¿Qué debes hacer?:</strong> Comunícate de inmediato con tu supervisor o con <strong>${remitenteNombre}</strong> (${remitenteRol}) para programar tu curso de actualización y reactivar tu pase.
+            <div style="background: rgba(225, 29, 72, 0.15); border-left: 4px solid #f43f5e; padding: 14px 18px; border-radius: 8px; color: #fecdd3; margin-top: 14px; font-size: 13px;">
+                <strong style="color: #fda4af; display: block; margin-bottom: 4px; font-size: 14px;">DICTAMEN DE GARITA: ACCESO TEMPORALMENTE RESTRINGIDO</strong>
+                Conforme a los lineamientos del D.S. 024-2016-EM, la vigencia reglamentaria para <strong>${certificado.nombre_curso}</strong> ha culminado el <strong>${fechaVencFormatted}</strong>.<br><br>
+                👉 <strong>Acción requerida:</strong> Comunícate con tu supervisor HSE o con <strong>${remitenteNombre}</strong> para programar tu curso de actualización y tramitar la renovación de tu pase de ingreso a mina.
             </div>
         `;
     } else if (diasRestantes <= 90) {
         estadoKey = 'POR_VENCER';
-        estadoLabel = `⚠️ POR VENCER (${diasRestantes} DÍAS RESTANTES)`;
+        estadoLabel = `⚠️ PASE ACTIVO - PRÓXIMO A VENCER (${diasRestantes} DÍAS RESTANTES)`;
         bannerGrad = 'linear-gradient(135deg, #d97706, #f59e0b)';
         colorTextoBanner = '#451a03';
         iconoBanner = '⏳';
-        tituloBanner = `TU CERTIFICADO ESTÁ PRÓXIMO A VENCER (${diasRestantes} DÍAS)`;
+        tituloBanner = `PASE VIGENTE - AVISO PREVENTIVO DE VENCIMIENTO (${diasRestantes} DÍAS)`;
         explicacionHTML = `
-            <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #fde68a; display: block; margin-bottom: 4px;">¿Cuál es tu condición actual y por qué se te notifica?:</strong>
-                Actualmente <strong>tu pase sigue activo</strong> y puedes ingresar a laborar con normalidad. Sin embargo, se te alerta con anticipación preventiva para que coordines con tu supervisor o con <strong>${remitenteNombre}</strong> la fecha de tu curso de actualización antes del <strong>${fechaVencFormatted}</strong>, ya que cumplido ese día, el sistema de garita denegará tu acceso automáticamente.
+            <div style="background: rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 8px; color: #fef3c7; margin-top: 14px; font-size: 13px;">
+                <strong style="color: #fde68a; display: block; margin-bottom: 4px; font-size: 14px;">✅ CONDICIÓN NORMATIVA: ACCESO PERMITIDO A PLANTA</strong>
+                Tu acreditación en <strong>${certificado.nombre_curso}</strong> se encuentra <strong>PLENAMENTE ACTIVA Y VIGENTE</strong>. Puedes ingresar a las instalaciones operativas con total normalidad.<br><br>
+                📌 <em>Nota preventiva:</em> Tu certificado vencerá el <strong>${fechaVencFormatted}</strong> (restan ${diasRestantes} días). Te sugerimos coordinar oportunamente con tu empresa contratista la recertificación periódica.
             </div>
         `;
     } else {
+        // 100% APTO Y APROBADO CON PROTOCOLO MINERO
         explicacionHTML = `
-            <div style="background: rgba(16, 185, 129, 0.15); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; color: #d1fae5; margin-top: 14px; font-size: 13px;">
-                <strong style="color: #6ee7b7; display: block; margin-bottom: 4px;">¿Cuál es tu condición actual?:</strong>
-                Tu certificado cumple con todas las exigencias técnicas y reglamentarias del D.S. 024-2016-EM. Tu pase de ingreso a mina se encuentra <strong>100% ACTIVO</strong>. Puedes presentarte en la <strong>Garita de Control Principal</strong> con tu DNI para ingresar directamente a planta y realizar tus labores con normalidad.
+            <div style="background: rgba(16, 185, 129, 0.15); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 8px; color: #d1fae5; margin-top: 14px; font-size: 13px;">
+                <strong style="color: #6ee7b7; display: block; margin-bottom: 6px; font-size: 14px;">✅ CONDICIÓN AUDITADA: PERSONAL APTO Y HABILITADO</strong>
+                El Centro de Control y Homologación certifica que tu expediente para <strong>${certificado.nombre_curso}</strong> cumple satisfactoriamente con los estándares y requisitos técnicos exigidos por el <strong>D.S. 024-2016-EM</strong>.<br><br>
+                🎫 <strong>Estatus en Garita:</strong> Tu pase de ingreso a operaciones mineras se encuentra <strong>100% AUTORIZADO</strong>. Te encuentras facultado para ingresar a planta portando tu DNI original.
+                ${faltaTelefonoSecundario ? `
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(16, 185, 129, 0.3); font-size: 12px; color: #a7f3d0;">
+                    💡 <strong>Actualización complementaria:</strong> Tu número de teléfono celular no se encuentra registrado en el sistema de alertas por SMS. Te sugerimos actualizar tu número de contacto con tu supervisor para coordinaciones operativas directas. (Tu pase de acceso no se ve afectado).
+                </div>` : ''}
             </div>
         `;
     }
@@ -884,11 +891,11 @@ async function enviarNotificacionIndividualTrabajador(params) {
     const faltaTelefonoReal = !trabajador.telefono_personal || trabajador.telefono_personal === '+51 987654321' || trabajador.telefono_personal === '+51 900000000' || trabajador.telefono_personal.trim() === '';
     const tienePDFReal = Boolean(certificado.url_pdf_storage || (certificado.pdf_filename && certificado.pdf_filename.toLowerCase().endsWith('.pdf') && !certificado.pdf_filename.includes('Excel')));
     const faltaPDFSustento = !tienePDFReal;
-    const faltaDatos = dniEsTemporal || faltaPDFSustento || faltaCorreoReal || faltaTelefonoReal;
+    const expedienteObservadoLegal = dniEsTemporal || faltaPDFSustento;
 
     let asunto = '';
-    if (faltaDatos) {
-        asunto = `⚠️ [REGULARIZACIÓN OBLIGATORIA] Expediente Observado para ${certificado.nombre_curso} - (${trabajador.nombres} ${trabajador.apellidos})`;
+    if (expedienteObservadoLegal) {
+        asunto = `⚠️ [DOCUMENTO PENDIENTE] Regularizar sustento para ${certificado.nombre_curso} - (${trabajador.nombres} ${trabajador.apellidos})`;
     } else if (diasRestantes <= 0) {
         asunto = `⛔ [ACCESO DENEGADO] Certificado Vencido de ${certificado.nombre_curso} - Pase Inhabilitado en Garita`;
     } else if (diasRestantes <= 90) {
