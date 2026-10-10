@@ -2746,11 +2746,23 @@ function renderizarKioskoEnTab(data) {
                 <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${c.fecha_vencimiento}</td>
                 <td style="padding: 10px; text-align: center;">${badgeVig}</td>
                 <td style="padding: 10px; text-align: center;">
-                    ${c.pdf_filename ? `
-                        <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')">
-                            📄 Ver PDF
+                    <div style="display: flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                        ${c.pdf_filename ? `
+                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Documento PDF">
+                                📄 Ver PDF
+                            </button>
+                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Reemplazar o cambiar archivo PDF subido">
+                                🔄 Cambiar PDF
+                            </button>
+                        ` : `
+                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar Documento PDF">
+                                📎 Adjuntar PDF
+                            </button>
+                        `}
+                        <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #dc2626; color: #fca5a5;" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar este certificado del historial">
+                            🗑️
                         </button>
-                    ` : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Sin archivo</span>`}
+                    </div>
                 </td>
             </tr>
         `;
@@ -2799,7 +2811,7 @@ function renderizarKioskoEnTab(data) {
                                 <th style="padding: 10px;">Emisión</th>
                                 <th style="padding: 10px;">Vencimiento</th>
                                 <th style="padding: 10px; text-align: center;">Estado</th>
-                                <th style="padding: 10px; text-align: center;">Documento</th>
+                                <th style="padding: 10px; text-align: center;">Documento & Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2830,9 +2842,31 @@ function renderizarKioskoEnTab(data) {
     container.style.display = 'block';
 }
 
+async function eliminarCertificadoDesdeKiosko(certId) {
+    if (!certId) return alert('ID de certificado no válido.');
+    if (!confirm('¿Está seguro de eliminar este certificado? Esta acción recalculará la habilitación del trabajador en garita.')) return;
+
+    try {
+        const res = await fetch(`/api/v1/certificados/${encodeURIComponent(certId)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al eliminar certificado');
+
+        alert('Certificado eliminado exitosamente.');
+        // Re-consultar la ficha en el Kiosco para reflejar el cambio en tiempo real
+        await consultarKioskoDesdeTab();
+        loadCertificados();
+        loadDashboardKPIs();
+    } catch(err) {
+        alert('Error al eliminar certificado: ' + err.message);
+    }
+}
+
 window.initTabKiosko = initTabKiosko;
 window.consultarKioskoDesdeTab = consultarKioskoDesdeTab;
 window.renderizarKioskoEnTab = renderizarKioskoEnTab;
+window.eliminarCertificadoDesdeKiosko = eliminarCertificadoDesdeKiosko;
 
 function descargarPadronFiltrado() {
     let url = '/api/v1/reportes/descargar-padron-excel';
@@ -2928,6 +2962,10 @@ async function handleGuardarAdjuntoPDF(e) {
         loadCertificados();
         loadDashboardKPIs();
         loadAlertasLog();
+        const inputKiosko = document.getElementById('input-kiosko-tab-dni');
+        if (inputKiosko && inputKiosko.value.trim().length >= 3) {
+            consultarKioskoDesdeTab();
+        }
 
     } catch (err) {
         statusBox.style.display = 'block';
