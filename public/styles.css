@@ -679,6 +679,97 @@ main {
     box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
 }
 
+/* =========================================================================
+   KIOSKO DIGITAL & EXPEDIENTE: ACTION BUTTONS (UX/UI PREMIUM)
+   ========================================================================= */
+.kiosko-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    line-height: 1;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.kiosko-action-btn svg {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.kiosko-action-btn:hover svg {
+    transform: scale(1.1);
+}
+
+.kiosko-action-btn.btn-view-pdf {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+.kiosko-action-btn.btn-view-pdf:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+    transform: translateY(-1px);
+}
+
+.kiosko-action-btn.btn-change-pdf {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+}
+
+.kiosko-action-btn.btn-change-pdf:hover {
+    background: rgba(245, 158, 11, 0.25);
+    border-color: #f59e0b;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+    transform: translateY(-1px);
+}
+
+.kiosko-action-btn.btn-attach-pdf {
+    background: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+}
+
+.kiosko-action-btn.btn-attach-pdf:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: #38bdf8;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
+    transform: translateY(-1px);
+}
+
+.kiosko-action-btn.btn-delete-cert {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+}
+
+.kiosko-action-btn.btn-delete-cert:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #dc2626;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.3);
+    transform: translateY(-1px);
+}
+
 /* Company Profiles Grid */
 .company-grid {
     display: grid;

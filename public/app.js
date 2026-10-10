@@ -2736,31 +2736,44 @@ function renderizarKioskoEnTab(data) {
         else badgeVig = `<span class="badge badge-success">✓ VIGENTE (${c.dias_restantes}d)</span>`;
 
         filasCerts += `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px; color: var(--text-secondary);">${idx + 1}</td>
-                <td style="padding: 10px;">
-                    <strong style="color: #fff; font-size: 0.88rem;">${c.nombre_curso}</strong><br>
-                    <small style="color: var(--text-secondary);">${c.entidad_emisora} &bull; ${c.horas_lectivas} hrs</small>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); transition: background 0.15s ease;">
+                <td style="padding: 12px 10px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; text-align: center;">${idx + 1}</td>
+                <td style="padding: 12px 14px;">
+                    <div style="font-weight: 700; color: #f8fafc; font-size: 0.92rem; line-height: 1.35; margin-bottom: 4px;">${c.nombre_curso}</div>
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #94a3b8;">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">🏢 ${c.entidad_emisora}</span>
+                        <span>•</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; color: #38bdf8; font-weight: 600;">⏱️ ${c.horas_lectivas} hrs</span>
+                    </div>
                 </td>
-                <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">${formatFechaUI(c.fecha_emision)}</td>
-                <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${formatFechaUI(c.fecha_vencimiento)}</td>
-                <td style="padding: 10px; text-align: center;">${badgeVig}</td>
-                <td style="padding: 10px; text-align: center;">
-                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                <td style="padding: 12px 10px; font-size: 0.84rem; color: #cbd5e1; font-family: 'JetBrains Mono', Consolas, monospace; white-space: nowrap;">
+                    ${formatFechaUI(c.fecha_emision)}
+                </td>
+                <td style="padding: 12px 10px; font-size: 0.84rem; font-weight: 700; color: #f8fafc; font-family: 'JetBrains Mono', Consolas, monospace; white-space: nowrap;">
+                    ${formatFechaUI(c.fecha_vencimiento)}
+                </td>
+                <td style="padding: 12px 10px; text-align: center; white-space: nowrap;">
+                    ${badgeVig}
+                </td>
+                <td style="padding: 12px 12px; text-align: center; white-space: nowrap;">
+                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                         ${c.pdf_filename ? `
-                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Documento PDF">
-                                📄 Ver PDF
+                            <button type="button" class="kiosko-action-btn btn-view-pdf" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Certificado Oficial">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <span>Ver PDF</span>
                             </button>
-                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Reemplazar o cambiar archivo PDF subido">
-                                🔄 Cambiar PDF
+                            <button type="button" class="kiosko-action-btn btn-change-pdf" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Actualizar o Reemplazar Documento">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Cambiar</span>
                             </button>
                         ` : `
-                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar Documento PDF">
-                                📎 Adjuntar PDF
+                            <button type="button" class="kiosko-action-btn btn-attach-pdf" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar PDF Original">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                <span>Adjuntar PDF</span>
                             </button>
                         `}
-                        <button type="button" class="btn-primary" style="width: 32px; height: 30px; padding: 0; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.15); border: 1px solid #dc2626; color: #fca5a5; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar este certificado del historial">
-                            🗑️
+                        <button type="button" class="kiosko-action-btn btn-delete-cert" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar Certificado">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
                     </div>
                 </td>
@@ -2806,12 +2819,12 @@ function renderizarKioskoEnTab(data) {
                     <table style="width: 100%; border-collapse: collapse; text-align: left;">
                         <thead>
                             <tr style="background: rgba(255,255,255,0.04); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
-                                <th style="padding: 10px;">#</th>
-                                <th style="padding: 10px;">Curso / Capacitación</th>
-                                <th style="padding: 10px;">Emisión</th>
-                                <th style="padding: 10px;">Vencimiento</th>
-                                <th style="padding: 10px; text-align: center;">Estado</th>
-                                <th style="padding: 10px; text-align: center;">Documento & Acciones</th>
+                                <th style="padding: 10px; width: 40px; text-align: center;">#</th>
+                                <th style="padding: 10px; min-width: 250px;">Curso / Capacitación</th>
+                                <th style="padding: 10px; width: 110px; white-space: nowrap;">Emisión</th>
+                                <th style="padding: 10px; width: 120px; white-space: nowrap;">Vencimiento</th>
+                                <th style="padding: 10px; width: 130px; text-align: center; white-space: nowrap;">Estado</th>
+                                <th style="padding: 10px; width: 220px; text-align: center; white-space: nowrap;">Documento & Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
