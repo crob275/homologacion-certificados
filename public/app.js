@@ -2746,20 +2746,20 @@ function renderizarKioskoEnTab(data) {
                 <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${formatFechaUI(c.fecha_vencimiento)}</td>
                 <td style="padding: 10px; text-align: center;">${badgeVig}</td>
                 <td style="padding: 10px; text-align: center;">
-                    <div style="display: flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;">
                         ${c.pdf_filename ? `
-                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Documento PDF">
+                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Documento PDF">
                                 📄 Ver PDF
                             </button>
-                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Reemplazar o cambiar archivo PDF subido">
+                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Reemplazar o cambiar archivo PDF subido">
                                 🔄 Cambiar PDF
                             </button>
                         ` : `
-                            <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar Documento PDF">
+                            <button type="button" class="btn-primary" style="min-width: 105px; height: 30px; padding: 0 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar Documento PDF">
                                 📎 Adjuntar PDF
                             </button>
                         `}
-                        <button type="button" class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #dc2626; color: #fca5a5;" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar este certificado del historial">
+                        <button type="button" class="btn-primary" style="width: 32px; height: 30px; padding: 0; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.15); border: 1px solid #dc2626; color: #fca5a5; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar este certificado del historial">
                             🗑️
                         </button>
                     </div>
