@@ -2742,8 +2742,8 @@ function renderizarKioskoEnTab(data) {
                     <strong style="color: #fff; font-size: 0.88rem;">${c.nombre_curso}</strong><br>
                     <small style="color: var(--text-secondary);">${c.entidad_emisora} &bull; ${c.horas_lectivas} hrs</small>
                 </td>
-                <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">${c.fecha_emision}</td>
-                <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${c.fecha_vencimiento}</td>
+                <td style="padding: 10px; font-size: 0.82rem; color: var(--text-secondary); font-family: monospace;">${formatFechaUI(c.fecha_emision)}</td>
+                <td style="padding: 10px; font-size: 0.82rem; color: #fff; font-weight: 600; font-family: monospace;">${formatFechaUI(c.fecha_vencimiento)}</td>
                 <td style="padding: 10px; text-align: center;">${badgeVig}</td>
                 <td style="padding: 10px; text-align: center;">
                     <div style="display: flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: wrap;">
