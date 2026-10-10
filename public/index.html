@@ -2,13 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f59e0b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HomologaControl">
     <title>HomologaControl Minería - Control de Homologaciones & HSE</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons Vectoriales Modernos (Calidad Enterprise) -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
+    </script>
 </head>
 <body>
 
@@ -68,6 +80,15 @@
 
             <!-- RIGHT FORM SECTION: EXECUTIVE CORPORATE LOGIN -->
             <div class="login-form-panel">
+                <!-- Mobile-Only Brand Header (Shows logo and platform name on mobile devices) -->
+                <div class="login-mobile-header">
+                    <div class="login-mobile-logo-icon">⛏️</div>
+                    <div>
+                        <h2 class="login-mobile-title">HomologaControl</h2>
+                        <span class="login-mobile-subtitle">Minería D.S. 024-2016-EM</span>
+                    </div>
+                </div>
+
                 <div class="login-form-header">
                     <h3>Acceso a la Plataforma</h3>
                     <p>Ingrese sus credenciales corporativas autorizadas para acceder al sistema.</p>
@@ -104,9 +125,9 @@
                     <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
                         Verifique en tiempo real si su pase de garita está vigente o consulte sus certificados ingresando su DNI.
                     </p>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="public-search-dni" class="form-control" placeholder="Ingrese su DNI (8 dígitos)" maxlength="12" style="font-size: 0.85rem; padding: 0.5rem 0.75rem;">
-                        <button type="button" class="btn-primary" onclick="consultarHabilitacionTrabajadorPublico()" style="padding: 0.5rem 0.95rem; font-size: 0.82rem; white-space: nowrap; font-weight: 700;">
+                    <div class="worker-check-row" style="display: flex; gap: 8px;">
+                        <input type="text" id="public-search-dni" class="form-control" placeholder="Ingrese su DNI (8 dígitos)" maxlength="12" style="font-size: 0.85rem; padding: 0.65rem 0.75rem;">
+                        <button type="button" class="btn-primary" onclick="consultarHabilitacionTrabajadorPublico()" style="padding: 0.65rem 1rem; font-size: 0.85rem; white-space: nowrap; font-weight: 700; min-height: 42px;">
                             Consultar
                         </button>
                     </div>
