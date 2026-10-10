@@ -309,6 +309,12 @@ function aplicarPrivilegiosRol(rol) {
         scopeBar.style.display = (esGlobal && (rol === 'ADMINISTRADOR' || rol === 'SUPERVISOR')) ? 'flex' : 'none';
     }
 
+    // Adaptar también elementos del Mobile Bottom Bar y Action Sheet Drawer
+    const mobSupervisor = document.getElementById('mob-nav-supervisor');
+    const mobSheetUsuarios = document.getElementById('mob-sheet-usuarios');
+    const mobSheetSolicitudes = document.getElementById('mob-sheet-solicitudes');
+    const mobSheetPowerBI = document.getElementById('mob-sheet-powerbi');
+
     if (rol === 'ADMINISTRADOR') {
         if (btnAddEmp) btnAddEmp.style.display = esGlobal ? 'inline-block' : 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'inline-block';
@@ -316,6 +322,10 @@ function aplicarPrivilegiosRol(rol) {
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block';
         if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'inline-block';
+        if (mobSupervisor) mobSupervisor.style.display = 'flex';
+        if (mobSheetUsuarios) mobSheetUsuarios.style.display = 'flex';
+        if (mobSheetSolicitudes) mobSheetSolicitudes.style.display = 'flex';
+        if (mobSheetPowerBI) mobSheetPowerBI.style.display = 'flex';
     } else if (rol === 'SUPERVISOR') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
@@ -323,6 +333,10 @@ function aplicarPrivilegiosRol(rol) {
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none';
         if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+        if (mobSupervisor) mobSupervisor.style.display = 'flex';
+        if (mobSheetUsuarios) mobSheetUsuarios.style.display = 'none';
+        if (mobSheetSolicitudes) mobSheetSolicitudes.style.display = 'flex';
+        if (mobSheetPowerBI) mobSheetPowerBI.style.display = 'none';
     } else if (rol === 'CONTRATISTA') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
@@ -330,6 +344,10 @@ function aplicarPrivilegiosRol(rol) {
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'inline-block'; // Admin de empresa administra usuarios de su contratista
         if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'inline-block'; // Admin de empresa también gestiona solicitudes de su personal
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+        if (mobSupervisor) mobSupervisor.style.display = 'none';
+        if (mobSheetUsuarios) mobSheetUsuarios.style.display = 'flex';
+        if (mobSheetSolicitudes) mobSheetSolicitudes.style.display = 'flex';
+        if (mobSheetPowerBI) mobSheetPowerBI.style.display = 'none';
     } else if (rol === 'OPERADOR') {
         if (btnAddEmp) btnAddEmp.style.display = 'none';
         if (btnEditEmp) btnEditEmp.style.display = 'none';
@@ -337,6 +355,10 @@ function aplicarPrivilegiosRol(rol) {
         if (tabUsuariosBtn) tabUsuariosBtn.style.display = 'none'; // OPERADOR DE CARGA NO TIENE ACCESO A USUARIOS & ROLES
         if (tabSolicitudesBtn) tabSolicitudesBtn.style.display = 'none';
         if (tabPowerBIBtn) tabPowerBIBtn.style.display = 'none';
+        if (mobSupervisor) mobSupervisor.style.display = 'none';
+        if (mobSheetUsuarios) mobSheetUsuarios.style.display = 'none';
+        if (mobSheetSolicitudes) mobSheetSolicitudes.style.display = 'none';
+        if (mobSheetPowerBI) mobSheetPowerBI.style.display = 'none';
     }
     actualizarBadgeSolicitudesPendientes();
 }
@@ -645,13 +667,31 @@ async function handleSaveCompany(e) {
     }
 }
 
-// Tab Switching Logic
+// Tab Switching Logic (Sincronizado Desktop & Mobile Bottom Bar)
 function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.classList.remove('active'));
 
-    event.target.classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+    // Activar pestaña Desktop
+    const desktopBtn = document.getElementById(`tab-btn-${tabId}`);
+    if (desktopBtn) desktopBtn.classList.add('active');
+
+    // Activar pestaña Mobile Bottom Bar si existe directamente
+    const mobileBtn = document.getElementById(`mob-nav-${tabId}`);
+    if (mobileBtn) {
+        mobileBtn.classList.add('active');
+    } else {
+        // Si es un módulo secundario abierto desde el Drawer "Más"
+        const moreBtn = document.getElementById('mob-nav-more');
+        if (moreBtn) moreBtn.classList.add('active');
+    }
+
+    const tabContent = document.getElementById(`tab-${tabId}`);
+    if (tabContent) tabContent.classList.add('active');
+
+    // Scroll to top suave al cambiar de pestaña
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (tabId === 'dashboard') loadDashboardKPIs();
     if (tabId === 'kiosko') initTabKiosko();
@@ -662,6 +702,18 @@ function switchTab(tabId) {
     if (tabId === 'solicitudes') loadSolicitudesCorreccion();
     if (tabId === 'cron') loadAlertasLog();
     if (tabId === 'powerbi') loadPowerBIPreview();
+}
+
+function toggleMobileMoreMenu() {
+    const sheet = document.getElementById('mobile-more-sheet');
+    if (!sheet) return;
+    if (sheet.style.display === 'none' || !sheet.style.display) {
+        sheet.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    } else {
+        sheet.style.display = 'none';
+        document.body.style.overflow = '';
+    }
 }
 
 // 1. Load Dashboard KPIs & Render Chart

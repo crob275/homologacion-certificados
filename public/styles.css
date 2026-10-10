@@ -1520,5 +1520,184 @@ main {
     .worker-check-row {
         flex-direction: column !important;
     }
+
+    /* Ocultar barra superior en móviles a favor del Bottom Navigation de alta gama */
+    .header-nav-row {
+        display: none !important;
+    }
+
+    /* Espaciado inferior para no tapar contenido con el bottom navigation */
+    main {
+        padding-bottom: 75px !important;
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+    }
 }
+
+/* ==============================================================================
+   MODERN BOTTOM NAVIGATION BAR (ESTILO APP NATIVA IOS & ANDROID)
+   ============================================================================== */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: rgba(8, 14, 26, 0.94);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(245, 158, 11, 0.25);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 0.5rem;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 0;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-item span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.mobile-nav-item svg {
+    transition: transform 0.2s ease, stroke 0.2s ease;
+}
+
+.mobile-nav-item:active {
+    transform: scale(0.92);
+}
+
+.mobile-nav-item.active {
+    color: var(--accent-gold);
+}
+
+.mobile-nav-item.active svg {
+    stroke: var(--accent-gold);
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+    transform: translateY(-2px);
+}
+
+/* ==============================================================================
+   MOBILE ACTION SHEET (DRAWER MÓDULOS DEL SISTEMA)
+   ============================================================================== */
+.mobile-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: flex-end;
+    animation: fadeInSheet 0.25s ease-out;
+}
+
+.mobile-sheet-card {
+    width: 100%;
+    background: #0f172a;
+    border-top: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 24px 24px 0 0;
+    padding: 1rem 1.25rem 2.5rem 1.25rem;
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.9);
+    animation: slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-sheet-handle {
+    width: 44px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    margin: 0 auto 1.25rem auto;
+}
+
+.mobile-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-sheet-header h3 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.mobile-sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+}
+
+.mobile-sheet-item {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    color: #f8fafc;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.mobile-sheet-item:hover, .mobile-sheet-item:active {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: var(--accent-amber);
+    transform: translateY(-2px);
+}
+
+.mobile-sheet-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-sheet-item span {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+@keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes fadeInSheet {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 

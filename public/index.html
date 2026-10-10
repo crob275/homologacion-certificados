@@ -1150,6 +1150,67 @@
         </div>
     </div>
 
+    <!-- MODERN MOBILE BOTTOM APP NAVIGATION (iOS / ANDROID NATIVE PATTERN) -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav" style="display: none;">
+        <button class="mobile-nav-item active" id="mob-nav-dashboard" onclick="switchTab('dashboard')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+            <span>Dashboard</span>
+        </button>
+        <button class="mobile-nav-item" id="mob-nav-kiosko" onclick="switchTab('kiosko')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            <span>Kiosco</span>
+        </button>
+        <button class="mobile-nav-item" id="mob-nav-contratista" onclick="switchTab('contratista')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <span>Cuadrillas</span>
+        </button>
+        <button class="mobile-nav-item" id="mob-nav-supervisor" onclick="switchTab('supervisor')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span>Auditoría</span>
+        </button>
+        <button class="mobile-nav-item" id="mob-nav-more" onclick="toggleMobileMoreMenu()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+            <span>Más</span>
+        </button>
+    </nav>
+
+    <!-- MOBILE MORE MODULES ACTION SHEET (DRAWER) -->
+    <div id="mobile-more-sheet" class="mobile-sheet-overlay" onclick="toggleMobileMoreMenu()" style="display: none;">
+        <div class="mobile-sheet-card" onclick="event.stopPropagation()">
+            <div class="mobile-sheet-handle"></div>
+            <div class="mobile-sheet-header">
+                <h3>Módulos del Sistema</h3>
+                <button type="button" class="btn-close-modal" onclick="toggleMobileMoreMenu()">✕</button>
+            </div>
+            <div class="mobile-sheet-grid">
+                <button class="mobile-sheet-item" id="mob-sheet-usuarios" onclick="switchTab('usuarios'); toggleMobileMoreMenu();">
+                    <div class="mobile-sheet-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                    </div>
+                    <span>Usuarios & Roles</span>
+                </button>
+                <button class="mobile-sheet-item" id="mob-sheet-solicitudes" onclick="switchTab('solicitudes'); toggleMobileMoreMenu();">
+                    <div class="mobile-sheet-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    </div>
+                    <span>Solicitudes</span>
+                </button>
+                <button class="mobile-sheet-item" id="mob-sheet-cron" onclick="switchTab('cron'); toggleMobileMoreMenu();">
+                    <div class="mobile-sheet-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    </div>
+                    <span>Alertas Vencimiento</span>
+                </button>
+                <button class="mobile-sheet-item" id="mob-sheet-powerbi" onclick="switchTab('powerbi'); toggleMobileMoreMenu();">
+                    <div class="mobile-sheet-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    </div>
+                    <span>Conector Power BI</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
