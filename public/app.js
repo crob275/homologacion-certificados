@@ -2755,8 +2755,8 @@ function renderizarKioskoEnTab(data) {
                 <td style="padding: 12px 10px; text-align: center; white-space: nowrap;">
                     ${badgeVig}
                 </td>
-                <td style="padding: 12px 12px; text-align: center; white-space: nowrap;">
-                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <td style="padding: 12px 12px; text-align: center; vertical-align: middle;">
+                    <div style="display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 6px; width: 130px; margin: 0 auto;">
                         ${c.pdf_filename ? `
                             <button type="button" class="kiosko-action-btn btn-view-pdf" onclick="abrirVisorPDF('${c.pdf_filename}', '${(c.nombre_curso || 'Certificado').replace(/'/g, "\\'")}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}')" title="Visualizar Certificado Oficial">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -2764,7 +2764,7 @@ function renderizarKioskoEnTab(data) {
                             </button>
                             <button type="button" class="kiosko-action-btn btn-change-pdf" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Actualizar o Reemplazar Documento">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                                <span>Cambiar</span>
+                                <span>Cambiar PDF</span>
                             </button>
                         ` : `
                             <button type="button" class="kiosko-action-btn btn-attach-pdf" onclick="abrirModalAdjuntarPDF('${c.id}', '${(trab.nombres + ' ' + trab.apellidos).replace(/'/g, "\\'")}', '${trab.numero_documento || ''}', '${(c.nombre_curso || '').replace(/'/g, "\\'")}')" title="Adjuntar PDF Original">
@@ -2774,6 +2774,7 @@ function renderizarKioskoEnTab(data) {
                         `}
                         <button type="button" class="kiosko-action-btn btn-delete-cert" onclick="eliminarCertificadoDesdeKiosko('${c.id}')" title="Eliminar Certificado">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            <span>Eliminar</span>
                         </button>
                     </div>
                 </td>
@@ -2824,7 +2825,7 @@ function renderizarKioskoEnTab(data) {
                                 <th style="padding: 10px; width: 110px; white-space: nowrap;">Emisión</th>
                                 <th style="padding: 10px; width: 120px; white-space: nowrap;">Vencimiento</th>
                                 <th style="padding: 10px; width: 130px; text-align: center; white-space: nowrap;">Estado</th>
-                                <th style="padding: 10px; width: 220px; text-align: center; white-space: nowrap;">Documento & Acciones</th>
+                                <th style="padding: 10px; width: 160px; text-align: center; white-space: nowrap;">Documento & Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
